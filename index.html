@@ -115,6 +115,7 @@ h2{font-size:15px;margin:0 0 10px}
     <option value="t1" selected>📊 SSSGT Sales Combined</option>
     <option value="t2">🧾 Billwise Sales Combined</option>
     <option value="t3">🍽️ Zomato Order Level Stacker</option>
+    <option value="t4">📈 Revenue Summary Builder</option>
     <option disabled>── More tools coming soon ──</option>
   </select>
   <span class="tool-hint" id="toolHint">Stacks BillWise files into the 18-column Master Data for SSSG / SSTG.</span>
@@ -217,6 +218,56 @@ h2{font-size:15px;margin:0 0 10px}
   <div class="card"><h2>Preview <span style="color:var(--mute);font-weight:400">(first 100 rows)</span></h2><div class="wrap" style="max-height:420px"><table id="z_prev"></table></div></div>
 </div>
 </div>
+
+<div id="t4" class="tool-panel hide">
+<div class="card">
+  <h2 style="margin-top:0">Files</h2>
+  <div id="r_files"></div>
+  <input id="r_sumPick" type="file" accept=".xlsx" class="hide">
+  <input id="r_gstrPick" type="file" accept=".xlsx" class="hide">
+  <input id="r_tallyPick" type="file" accept=".xlsx" class="hide">
+  <p style="color:var(--mute);font-size:13px;margin:8px 0 0">Same inputs as run_this.py: the Revenue Summary workbook, the month's GSTR Working File, the Tally CCBkUp (optional), and the BillWise files. Nothing is uploaded — everything runs in your browser.</p>
+</div>
+<div id="r_drop" class="drop" tabindex="0" style="border:2px dashed var(--line);border-radius:16px;padding:44px 16px;text-align:center;cursor:pointer;background:var(--card)">
+  <div class="drop-icon">📥</div>
+  <b style="display:block;font-size:17px;margin-bottom:4px">Drop BillWise files here or click to choose</b>
+  <span style="color:var(--mute);font-size:13px">One per outlet — matched automatically by file name. Missing outlets get 0 in the Posist columns.</span>
+  <input id="r_pick" type="file" accept=".xlsx,.xls" multiple class="hide">
+</div>
+<div class="card"><h2>BillWise files by outlet</h2><div class="wrap"><table id="r_match"></table></div></div>
+<div class="card">
+  <div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">
+    <label>Month<br><input id="r_month" type="month" data-auto="1" style="padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:inherit"></label>
+    <label>New tab name<br><input id="r_tab" type="text" data-auto="1" placeholder="Oct'26" style="padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:inherit"></label>
+    <button id="r_build" class="pri" disabled>Build month tab</button>
+    <button id="r_clear">Clear</button>
+  </div>
+  <div class="note" id="r_monthNote" style="margin-top:8px"></div>
+  <div class="note" id="r_buildNote"></div>
+</div>
+<div id="r_proc" class="card processing hide">
+  <div class="spinner"></div>
+  <div class="proc-body">
+    <b id="r_procTitle">Building…</b>
+    <span id="r_procDetail">Starting…</span>
+    <div class="pbar"><div id="r_procFill"></div></div>
+  </div>
+  <div class="proc-pct" id="r_procPct">0%</div>
+</div>
+<div id="r_out" class="hide">
+  <div class="card" style="margin-top:16px">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">Result</h2>
+      <div class="row"><button id="r_dl" class="pri" disabled>⬇ Download Excel</button></div>
+    </div>
+    <div id="r_msg" class="bad" style="margin-top:8px"></div>
+    <div id="r_dlInfo" class="dl-size" style="margin-top:6px"></div>
+    <div class="stats" id="r_stats" style="margin-top:12px"></div>
+    <div class="note" id="r_warn"></div>
+  </div>
+  <div class="card"><h2>Preview — new month tab values</h2><div class="wrap" style="max-height:420px"><table id="r_prev"></table></div></div>
+</div>
+</div>
 </main>
 <div id="toast" role="status"></div>
 
@@ -285,7 +336,7 @@ importScripts('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.
 self.onmessage = function(e){
   var d = e.data;
   try{
-    var wb = XLSX.read(d.buf, {type:'array', cellNF:true});
+    var wb = XLSX.read(d.buf, {type:'array', cellNF:true, sheetRows:d.sheetRows||0});
     var name = d.sheet || wb.SheetNames[0];
     if(!wb.Sheets[name]){ self.postMessage({id:d.id, ok:false, error:'Sheet not found: '+name}); return; }
     var ws = wb.Sheets[name];
@@ -308,7 +359,7 @@ self.onmessage = function(e){
 };
 `;
 let _xw=null, _xwSeq=0; const _xwPending=new Map();
-function readSheetViaWorker(buf, sheet){
+function readSheetViaWorker(buf, sheet, opts){
   return new Promise(function(resolve, reject){
     try{
       if(!_xw){
@@ -319,12 +370,12 @@ function readSheetViaWorker(buf, sheet){
       var id=++_xwSeq;
       _xwPending.set(id, function(res){ if(res.ok) resolve(res); else reject(new Error(res.error)); });
       var copy=buf.slice(0); /* keep the original for the main-thread fallback */
-      _xw.postMessage({id:id, buf:copy, sheet:sheet||null}, [copy]);
+      _xw.postMessage({id:id, buf:copy, sheet:sheet||null, sheetRows:(opts&&opts.sheetRows)||0}, [copy]);
     }catch(err){ reject(err); }
   });
 }
-function readSheetMain(buf, sheet){
-  const wb=XLSX.read(buf,{type:'array',cellNF:true});
+function readSheetMain(buf, sheet, opts){
+  const wb=XLSX.read(buf,{type:'array',cellNF:true,sheetRows:(opts&&opts.sheetRows)||0});
   const name=sheet||wb.SheetNames[0];
   const ws=wb.Sheets[name];
   if(!ws) throw new Error('Sheet not found: '+name);
@@ -340,9 +391,9 @@ function readSheetMain(buf, sheet){
   }
   return {sheets:wb.SheetNames, data};
 }
-async function readSheet(buf, sheet){
-  try{ return await readSheetViaWorker(buf, sheet); }
-  catch(e){ return readSheetMain(buf, sheet); }
+async function readSheet(buf, sheet, opts){
+  try{ return await readSheetViaWorker(buf, sheet, opts); }
+  catch(e){ return readSheetMain(buf, sheet, opts); }
 }
 function unwrapCell(v){ return (v && typeof v==='object' && 'v' in v) ? v.v : v; }
 /* Duplicate identity: exact name, but strip Restroworks' long hex download hash
@@ -383,7 +434,7 @@ document.addEventListener('click', e=>{
   else if(tool==='t3'){ const gone=zRes.find(r=>r.name===name); zRes=zRes.filter(r=>r.name!==name); zSeen.delete(dedupeKey(name)); zRows=[]; zRes.forEach(r=>r.rows.forEach(x=>zRows.push([...x,r.name]))); zRender(); pushUndo('t3',gone); showToast('Removed '+name,{label:'Undo',fn:doUndo}); }
 });
 function showProc(p,total,title){
-  const box=$(p),dz=p==='m_proc'?$('m_drop'):p==='z_proc'?$('z_drop'):drop;
+  const box=$(p),dz=p==='m_proc'?$('m_drop'):p==='z_proc'?$('z_drop'):p==='r_proc'?$('r_drop'):drop;
   $(p+'Title').textContent=title||'Processing files…';
   $(p+'Detail').textContent='Starting… 0 of '+total;
   $(p+'Fill').style.width='0%'; $(p+'Pct').textContent='0%';
@@ -396,7 +447,7 @@ function updateProc(p,done,total,name){
 }
 function hideProc(p){
   $(p).classList.add('hide');
-  (p==='m_proc'?$('m_drop'):p==='z_proc'?$('z_drop'):drop).classList.remove('busy');
+  (p==='m_proc'?$('m_drop'):p==='z_proc'?$('z_drop'):p==='r_proc'?$('r_drop'):drop).classList.remove('busy');
 }
 $('themeToggle').onclick=()=>{
   const r=document.documentElement;
@@ -568,7 +619,8 @@ $('dl').onclick=async()=>{
 const TOOL_HINTS={
   t1:'Stacks BillWise files into the 18-column Master Data for SSSG / SSTG.',
   t2:'Keeps every column from the Posist exports and adds an Outlet column.',
-  t3:'Stacks the Order Level sheet from Zomato settlement files — same as zomato_orderlevel_stack.py, in the browser.'
+  t3:'Stacks the Order Level sheet from Zomato settlement files — same as zomato_orderlevel_stack.py, in the browser.',
+  t4:'Builds a new month tab in your Revenue Summary workbook — same as revenue_summary_automation.py, in the browser.'
 };
 function showTool(id){
   document.querySelectorAll('.tool-panel').forEach(el=>el.classList.toggle('hide',el.id!==id));
@@ -899,6 +951,586 @@ $('z_dl').onclick=async()=>{
   }
   $('z_dl').disabled=false; $('z_dl').textContent='⬇ Download Excel';
 };
+/* Revenue Summary Builder — core logic (browser + Node).
+   Port of revenue_summary_automation.py + run_this.py.
+   No DOM here: inputs are arrays-of-arrays (SheetJS) + an ExcelJS workbook.
+   ExcelJS is passed in so the same code runs in the browser (window.ExcelJS)
+   and in Node (require('exceljs')). */
+'use strict';
+
+const RS_OUTLET_MAP = {
+  "Bandra":         {gstr:"Bandra, Bandra West",          tally:"Bandra, Bandra West",         liquor:false},
+  "Breach Candy":   {gstr:"Breach Candy, Cumballa Hill",  tally:"Breach Candy, Cumballa Hill", liquor:false},
+  "Cloud Kitchen":  {gstr:"Cloud Kitchen, Parel",         tally:"Cloud Kitchen, Parel",        liquor:false},
+  "Jio BKC":        {gstr:"JIO World Drive, BKC",         tally:"JIO World Drive, BKC",        liquor:true},
+  "Kala Ghoda":     {gstr:"Kala Ghoda, Fort",             tally:"Kala Ghoda, Fort",            liquor:false},
+  "Powai":          {gstr:"Nutcracker - Powai",           tally:"NC Powai",                    liquor:true},
+  "Noa Bandra":     {gstr:"NOA, Bandra West",             tally:"Noa, Bandra West",            liquor:false},
+  "Noa Kala Ghoda": {gstr:"Noa, Kala Ghoda, Fort",        tally:"Noa, Kala Ghoda, Fort",       liquor:false},
+  "Noa Nepeansea":  {gstr:"NOA, Nepean Sea Road",         tally:"Noa, Nepean Sea Road",        liquor:false},
+  "Palladium":      {gstr:"Palladium, Lower Parel",       tally:"Palladium, Lower Parel",      liquor:true},
+};
+const RS_ROW_ORDER = ["Bandra","Breach Candy","Cloud Kitchen","Jio BKC","Kala Ghoda","Powai","Noa Bandra","Noa Kala Ghoda","Noa Nepeansea","Palladium"];
+const RS_OTHER_COLS = ["Packaging Charge [CART - SWIGGY]","Restaurant Packaging Charges","Food","Non Alcoholic Beverages"];
+const RS_LIQUOR_COL = "Beverages";
+const RS_OUTLET_PATTERNS = {
+  "Bandra":         {inc:["bandra"],        exc:["noa"]},
+  "Breach Candy":   {inc:["breach"],        exc:[]},
+  "Cloud Kitchen":  {inc:["parel"],         exc:[]},
+  "Jio BKC":        {inc:["bkc"],           exc:[]},
+  "Kala Ghoda":     {inc:["kala"],          exc:["noa"]},
+  "Powai":          {inc:["powai"],         exc:[]},
+  "Noa Bandra":     {inc:["noa","bandra"],  exc:[]},
+  "Noa Kala Ghoda": {inc:["noa","kala"],    exc:[]},
+  "Noa Nepeansea":  {inc:["noa","nepean"],  exc:[]},
+  "Palladium":      {inc:["palladium"],     exc:[]},
+};
+const RS_YELLOW_FILL = {type:"pattern", pattern:"solid", fgColor:{argb:"FFFFFF00"}};
+
+function rsNum(v){
+  if(typeof v==="number" && isFinite(v)) return v;
+  if(v && typeof v==="object" && typeof v.result==="number") return v.result;
+  return 0;
+}
+function rsDeep(o){ return o===undefined ? undefined : JSON.parse(JSON.stringify(o)); }
+
+/* ---- 1. Posist (BillWise AoA) ---- */
+function rsExtractPosist(aoa, isLiquor){
+  let headerIdx = -1;
+  for(let i=0;i<Math.min(10, aoa.length);i++){
+    const row = aoa[i]||[];
+    if(row[0]==="Deployment"){ headerIdx = i; break; }
+  }
+  if(headerIdx<0) throw new Error("Couldn't find the 'Deployment' header row in a BillWise file");
+  const headers = aoa[headerIdx]||[];
+  let gt = null;
+  for(let i=headerIdx+1;i<aoa.length;i++){
+    const row = aoa[i]||[];
+    if(row[0]==="Grand Total") gt = row;   // last one wins, like the Python loop
+  }
+  if(!gt) throw new Error("Couldn't find the 'Grand Total' row in a BillWise file");
+  const colVal = (name)=>{
+    const idx = headers.indexOf(name);
+    if(idx<0) return 0;
+    return rsNum(gt[idx]);
+  };
+  let other = 0;
+  for(const c of RS_OTHER_COLS){ if(headers.indexOf(c)>=0) other += colVal(c); }
+  let liquor = 0;
+  if(headers.indexOf(RS_LIQUOR_COL)>=0){
+    const bev = colVal(RS_LIQUOR_COL);
+    if(isLiquor) liquor = bev; else other += bev;
+  }
+  return [liquor, other];
+}
+
+/* ---- 2. GSTR Working (AoA, header row = index 2) ---- */
+function rsFindRow(aoa, label, maxRow){
+  const lim = Math.min(maxRow||200, aoa.length);
+  for(let r=0;r<lim;r++){ if((aoa[r]||[])[0]===label) return r; }
+  throw new Error("Row labelled '"+label+"' not found in GSTR Working sheet");
+}
+function rsExtractGstr(aoa){
+  const headers = aoa[2]||[];
+  const rNotInPosist = rsFindRow(aoa, "Add: Sales not in Posist");
+  const rTotal = rsFindRow(aoa, "Total Sales");
+  const rLiquor = rsFindRow(aoa, "Less : Liquor Sales");
+  const rScrapB2C = rsFindRow(aoa, "B2C : (Scrap Sales)") + 1;
+  const rScrapB2B = rsFindRow(aoa, "B2B : (Scrap Sales)") + 1;
+  const rowAt = (r)=> aoa[r]||[];
+  const out = {};
+  for(let idx=0; idx<headers.length; idx++){
+    const h = headers[idx];
+    if(!h || h==="PARTICULAR" || h==="Total Sales ") continue;
+    const notInPosist = rsNum(rowAt(rNotInPosist)[idx]);
+    const total = rsNum(rowAt(rTotal)[idx]);
+    const liquorVat = rsNum(rowAt(rLiquor)[idx]);
+    const scrap = rsNum(rowAt(rScrapB2C)[idx]) + rsNum(rowAt(rScrapB2B)[idx]);
+    out[h] = {
+      otherThanLiquorGstr1: total - notInPosist - liquorVat,
+      liquorVat: liquorVat,
+      otherIncome: notInPosist,
+      scrapSale: scrap,
+    };
+  }
+  return out;
+}
+
+/* ---- 3. Tally Cost Centre Breakup (AoA, first sheet) ---- */
+const RS_TALLY_LIQUOR = "Sales - Beverages Liquor";
+const RS_TALLY_OTHER = ["Sales - Beverages Non Alcoholic","Sales - Food","Sales - Packaging Charges","Sales - Restaurant Packaging Charges"];
+const RS_TALLY_SCRAP_PREFIX = "Sales - Scrap";
+const RS_TALLY_OTHER_INCOME = "Other Income";
+function rsExtractTally(aoa){
+  let ccRowIdx = -1;
+  for(let r=0;r<Math.min(20, aoa.length);r++){
+    const row = aoa[r]||[];
+    if(row.some(v=>typeof v==="string" && v.indexOf("Cost Centre:")===0)){ ccRowIdx = r; break; }
+  }
+  if(ccRowIdx<0) throw new Error("Couldn't find a 'Cost Centre:' header row in the CCBkUp file");
+  const ccRow = aoa[ccRowIdx]||[];
+  const blocks = {};   // cost centre name -> Closing Balance column index
+  for(let idx=0; idx<ccRow.length; idx++){
+    const v = ccRow[idx];
+    if(typeof v==="string" && v.indexOf("Cost Centre:")===0){
+      blocks[v.replace("Cost Centre:","").trim()] = idx + 2;
+    }
+  }
+  let partIdx = -1;
+  for(let r=ccRowIdx; r<Math.min(ccRowIdx+10, aoa.length); r++){
+    if((aoa[r]||[])[0]==="Particulars"){ partIdx = r; break; }
+  }
+  if(partIdx<0) throw new Error("Couldn't find the 'Particulars' row in the CCBkUp file");
+  const lineRows = {};  // label -> row array
+  for(let r=partIdx+3; r<aoa.length; r++){
+    const label = (aoa[r]||[])[0];
+    if(!label) continue;
+    if(label==="Grand Total") break;
+    lineRows[label] = aoa[r]||[];
+  }
+  const lineVal = (labelOrPrefix, balCol, prefix)=>{
+    for(const label of Object.keys(lineRows)){
+      if(prefix ? label.indexOf(labelOrPrefix)===0 : label===labelOrPrefix){
+        return rsNum(lineRows[label][balCol]);
+      }
+    }
+    return 0;
+  };
+  const out = {};
+  for(const name of Object.keys(blocks)){
+    const bal = blocks[name];
+    out[name] = {
+      liquorSales: lineVal(RS_TALLY_LIQUOR, bal, false),
+      otherThanLiquorSales: RS_TALLY_OTHER.reduce((s,l)=>s+lineVal(l, bal, false), 0),
+      scrapSale: lineVal(RS_TALLY_SCRAP_PREFIX, bal, true),
+      otherIncome: lineVal(RS_TALLY_OTHER_INCOME, bal, false),
+    };
+  }
+  return out;
+}
+
+/* ---- month + tab-name detection (port of run_this.py) ---- */
+const RS_MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const RS_MONTHS_FULL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+function rsDetectMonth(billwiseNames, gstrName){
+  for(const name of billwiseNames){
+    const m = name.match(/\((\d{4})\.(\d{2})\.\d{2}--/);
+    if(m) return new Date(+m[1], +m[2]-1, 1);
+  }
+  if(gstrName){
+    const m = gstrName.match(/(\d{4})(\d{2})/);
+    if(m) return new Date(+m[1], +m[2]-1, 1);
+  }
+  return null;
+}
+function rsFmtMonth(d, fmt){
+  const b = RS_MONTHS_SHORT[d.getMonth()], B = RS_MONTHS_FULL[d.getMonth()];
+  const yy = String(d.getFullYear()).slice(2), YYYY = String(d.getFullYear());
+  switch(fmt){
+    case "%b'%y": return b+"'"+yy;
+    case "%B'%y": return B+"'"+yy;
+    case "%b-%y": return b+"-"+yy;
+    case "%B-%y": return B+"-"+yy;
+    case "%b %Y": return b+" "+YYYY;
+    case "%B %Y": return B+" "+YYYY;
+    case "%b%y": return b+yy;
+    case "%B%y": return B+yy;
+    default: return b+"'"+yy;
+  }
+}
+function rsTabNameFor(monthDate, prevName){
+  const prev = new Date(monthDate.getFullYear(), monthDate.getMonth()-1, 1);
+  const fmts = ["%b'%y","%B'%y","%b-%y","%B-%y","%b %Y","%B %Y","%b%y","%B%y"];
+  for(const f of fmts){ if(rsFmtMonth(prev, f)===prevName) return rsFmtMonth(monthDate, f); }
+  return rsFmtMonth(monthDate, "%b'%y");
+}
+function rsMatchBillwise(fileNames){
+  const matched = {}; const unmatched = [];
+  for(const name of fileNames){
+    const low = name.toLowerCase();
+    let hit = null;
+    for(const outlet of RS_ROW_ORDER){
+      const p = RS_OUTLET_PATTERNS[outlet];
+      if(p.inc.every(s=>low.indexOf(s)>=0) && p.exc.every(s=>low.indexOf(s)<0)){ hit = outlet; break; }
+    }
+    if(hit && !matched[hit]) matched[hit] = name;
+    else if(hit && matched[hit]) unmatched.push(name);   // second file for same outlet
+    else if(!hit) unmatched.push(name);
+  }
+  return {matched, unmatched};
+}
+
+/* ---- worksheet clone with styles (ExcelJS has no native copy) ---- */
+function rsCloneWorksheet(wb, tpl, name){
+  const ws = wb.addWorksheet(name);
+  tpl.columns.forEach((col, i)=>{
+    const nc = ws.getColumn(i+1);
+    if(col.width!==undefined && col.width!==null) nc.width = col.width;
+    if(col.hidden) nc.hidden = true;
+    if(col.style) nc.style = rsDeep(col.style);
+  });
+  const merges = (tpl.model && tpl.model.merges) || [];
+  merges.forEach((m)=>{ try{ ws.mergeCells(m); }catch(e){} });
+  if(tpl.views) { try{ ws.views = rsDeep(tpl.views); }catch(e){} }
+  if(tpl.properties) { try{ ws.properties = rsDeep(tpl.properties); }catch(e){} }
+  if(tpl.pageSetup) { try{ ws.pageSetup = rsDeep(tpl.pageSetup); }catch(e){} }
+  // NB: eachCell only walks up to row.cellCount, which misses styled-but-empty
+  // cells past the last valued cell (e.g. row 1, cols 5-17). Walk the full grid.
+  const maxR = tpl.rowCount, maxC = tpl.columnCount;
+  for(let rn=1; rn<=maxR; rn++){
+    const row = tpl.getRow(rn);
+    const nr = ws.getRow(rn);
+    if(row.height!==undefined && row.height!==null) nr.height = row.height;
+    if(row.hidden) nr.hidden = true;
+    for(let cn=1; cn<=maxC; cn++){
+      const cell = row.getCell(cn);
+      const nc = nr.getCell(cn);
+      const v = cell.value;
+      if(v && typeof v==="object" && v.formula!==undefined){
+        nc.value = {formula: v.formula};   // drop cached result; Excel recalcs on open
+      } else if(v!==null && v!==undefined){
+        nc.value = (v instanceof Date) ? new Date(v.getTime()) : v;
+      }
+      if(cell.style && Object.keys(cell.style).length) nc.style = rsDeep(cell.style);
+    }
+  }
+  return ws;
+}
+
+/* ---- main build ----
+   opts: {summaryBuf, gstrAoA, tallyAoA|null, billwiseAoA:{outlet:aoa}, monthDate:Date, monthName:string}
+   Returns {buffer, preview:[{outlet,...}], warnings:[...], monthName, templateName} */
+async function rsBuildRevenueSummary(ExcelJS, opts){
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(opts.summaryBuf);
+  const sheetNames = wb.worksheets.map(w=>w.name);
+  const monthNames = sheetNames.filter(s=>s!=="Total");
+  if(!monthNames.length) throw new Error("The Revenue Summary workbook has no month tabs to copy the style from");
+  const templateName = monthNames[monthNames.length-1];
+  const template = wb.getWorksheet(templateName);
+  if(opts.monthName && sheetNames.indexOf(opts.monthName)>=0)
+    throw new Error("Tab '"+opts.monthName+"' already exists in the workbook - nothing to do");
+
+  const gstrData = rsExtractGstr(opts.gstrAoA);
+  const tallyData = opts.tallyAoA ? rsExtractTally(opts.tallyAoA) : null;
+  const warnings = [];
+  if(!tallyData) warnings.push("No CCBkUp file - Tally columns left 0 and highlighted yellow for manual entry");
+
+  // compute all outlet values first (so a missing GSTR/Tally outlet fails before we touch the workbook)
+  const computed = {};
+  for(const outlet of RS_ROW_ORDER){
+    const cfg = RS_OUTLET_MAP[outlet];
+    const gstr = gstrData[cfg.gstr];
+    if(!gstr) throw new Error("Outlet '"+outlet+"' (GSTR header '"+cfg.gstr+"') not found in the GSTR Working file");
+    let liquorPosist = 0, otherPosist = 0;
+    if(opts.billwiseAoA[outlet]){
+      const pair = rsExtractPosist(opts.billwiseAoA[outlet], cfg.liquor);
+      liquorPosist = pair[0]; otherPosist = pair[1];
+    } else {
+      warnings.push("No BillWise file for "+outlet+" - Posist columns left 0");
+    }
+    let tally = null;
+    if(tallyData){
+      tally = tallyData[cfg.tally];
+      if(!tally) throw new Error("Outlet '"+outlet+"' (Tally cost centre '"+cfg.tally+"') not found in the CCBkUp file");
+    }
+    computed[outlet] = {gstr, tally, liquorPosist, otherPosist};
+  }
+
+  if(opts.monthName && wb.getWorksheet(opts.monthName)) wb.removeWorksheet(wb.getWorksheet(opts.monthName).id);
+  const ws = rsCloneWorksheet(wb, template, opts.monthName);
+  // ExcelJS writes a Date as its UTC instant, so build the date at UTC midnight:
+  // a local-midnight date (e.g. Oct 1 00:00 IST) would otherwise land as Sep 30 18:30.
+  const md = opts.monthDate;
+  ws.getCell("A1").value = new Date(Date.UTC(md.getFullYear(), md.getMonth(), md.getDate()));   // keeps the template's mmm-yy number format
+
+  const COLS = "BCDEFGHIJKLMNOPQ";
+  for(let i=0;i<RS_ROW_ORDER.length;i++){
+    const outlet = RS_ROW_ORDER[i];
+    const r = 4+i;
+    const c = computed[outlet];
+    const gstr = c.gstr, tally = c.tally;
+    ws.getCell(r, 2).value = c.liquorPosist;            // B Liquor Posist
+    ws.getCell(r, 5).value = c.otherPosist;             // E Other-than-liquor Posist
+    const tallyVals = tally ? [tally.liquorSales, tally.otherThanLiquorSales, tally.scrapSale] : [null, null, null];
+    [3, 6, 12].forEach((col, k)=>{
+      const cell = ws.getCell(r, col);
+      const val = tallyVals[k];
+      cell.value = (val===null || val===undefined) ? 0 : val;
+      if(val===null || val===undefined) cell.fill = rsDeep(RS_YELLOW_FILL);
+    });
+    ws.getCell(r, 4).value = gstr.liquorVat;            // D Liquor VAT/GSTR-1
+    ws.getCell(r, 7).value = gstr.otherThanLiquorGstr1; // G Other-than-liquor GSTR-1
+    ws.getCell(r, 8).value = 0;                         // H Other Income - Posist
+    ws.getCell(r, 9).value = (tally && tally.otherIncome!==undefined && tally.otherIncome!==null) ? tally.otherIncome : gstr.otherIncome; // I Other Income - Tally
+    ws.getCell(r, 10).value = gstr.otherIncome;         // J Other Income - GSTR-1
+    ws.getCell(r, 11).value = 0;                        // K Scrap - Posist
+    ws.getCell(r, 13).value = gstr.scrapSale;           // M Scrap - GSTR-1
+    ws.getCell(r, 14).value = {formula: "B"+r+"+E"+r+"+H"+r+"+K"+r};
+    ws.getCell(r, 15).value = {formula: "C"+r+"+F"+r+"+I"+r+"+L"+r};
+    ws.getCell(r, 16).value = {formula: "+G"+r+"+J"+r+"+M"+r+"+D"+r};
+    // Q (Total Sales as per MIS) is blanked in the new tab, per the user's call
+    // (2026-11-08). The Python script intends this too, but openpyxl's
+    // cell(..., value=None) silently leaves the template's values in place,
+    // so the Python output still carries the previous month's MIS numbers.
+    ws.getCell(r, 17).value = null;
+  }
+  for(const ch of "BCDEFGHIJKLMNOP"){
+    ws.getCell(ch+"14").value = {formula: "SUM("+ch+"4:"+ch+"13)"};
+  }
+  ws.getCell("F15").value = {formula: "+F14-G14"};
+  ws.getCell("I15").value = {formula: "+I14-J14"};
+  ws.getCell("L15").value = {formula: "+L14-M14"};
+  ws.getCell("O15").value = {formula: "+O14-P14"};
+
+  // Total sheet: append the new month to every SUM formula
+  const totalWs = wb.getWorksheet("Total");
+  if(totalWs){
+    const escName = opts.monthName.replace(/'/g, "''");
+    for(let r=4;r<=13;r++){
+      for(const ch of COLS){
+        const cell = totalWs.getCell(ch+r);
+        const v = cell.value;
+        if(v && typeof v==="object" && typeof v.formula==="string" && v.formula){
+          cell.value = {formula: v.formula + "+'"+escName+"'!"+ch+r};
+        } else if(typeof v==="string" && v.charAt(0)==="="){
+          cell.value = {formula: v.slice(1) + "+'"+escName+"'!"+ch+r};
+        }
+      }
+    }
+  } else {
+    warnings.push("No 'Total' sheet found - month totals not updated");
+  }
+
+  if(wb.calcProperties) wb.calcProperties.fullCalcOnLoad = true;
+  const buffer = await wb.xlsx.writeBuffer();
+  const preview = RS_ROW_ORDER.map((outlet, i)=>{
+    const c = computed[outlet];
+    return {
+      outlet: outlet, row: 4+i,
+      liquorPosist: c.liquorPosist, otherPosist: c.otherPosist,
+      liquorTally: c.tally ? c.tally.liquorSales : null,
+      otherTally: c.tally ? c.tally.otherThanLiquorSales : null,
+      liquorVat: c.gstr.liquorVat, otherGstr1: c.gstr.otherThanLiquorGstr1,
+      otherIncomeTally: c.tally ? c.tally.otherIncome : null,
+      otherIncomeGstr: c.gstr.otherIncome,
+      scrapTally: c.tally ? c.tally.scrapSale : null,
+      scrapGstr: c.gstr.scrapSale,
+    };
+  });
+  return {buffer: buffer, preview: preview, warnings: warnings, monthName: opts.monthName, templateName: templateName};
+}
+
+if(typeof module!=="undefined" && module.exports){
+  module.exports = {RS_OUTLET_MAP, RS_ROW_ORDER, RS_OUTLET_PATTERNS, rsNum, rsExtractPosist, rsExtractGstr, rsExtractTally, rsDetectMonth, rsTabNameFor, rsMatchBillwise, rsCloneWorksheet, rsBuildRevenueSummary};
+}
+
+/* ---------- Revenue Summary Builder (port of revenue_summary_automation.py + run_this.py) ---------- */
+let _excelJSPromise=null;
+function loadExcelJS(){
+  if(window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  if(_excelJSPromise) return _excelJSPromise;
+  _excelJSPromise=new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+    s.onload=()=>window.ExcelJS?res(window.ExcelJS):rej(new Error('ExcelJS failed to load from the CDN'));
+    s.onerror=()=>rej(new Error('Could not load ExcelJS from the CDN - check your connection and try again'));
+    document.head.appendChild(s);
+  });
+  return _excelJSPromise;
+}
+
+let rSum=null, rGstr=null, rTally=null;      // {name, buf}
+let rBw={};                                   // outlet -> {name, buf}
+let rSheets=[];                               // Revenue Summary sheet names
+let rOutBuf=null, rOutName='', rOutPreview=null;
+
+function rFileRow(label, inputId, file){
+  return `<div class="row" style="justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
+    <span>${label}</span>
+    <span class="row" style="gap:8px"><span style="color:var(--mute);font-size:13px;word-break:break-all">${file?esc(file.name):'<i>not chosen</i>'}</span>
+    <button data-rpick="${inputId}">Choose file</button></span></div>`;
+}
+function rRenderFiles(){
+  $('r_files').innerHTML =
+    rFileRow('📕 Revenue Summary workbook', 'r_sumPick', rSum) +
+    rFileRow('📗 GSTR Working File', 'r_gstrPick', rGstr) +
+    rFileRow('📘 CCBkUp (Tally) — optional', 'r_tallyPick', rTally);
+  const rows = RS_ROW_ORDER.map(o=>{
+    const f = rBw[o];
+    return `<tr><td>${esc(o)}</td><td title="${f?esc(f.name):''}">${f?esc(f.name):'<span style="color:var(--mute)">— no file (Posist columns will be 0)</span>'}</td><td>${f?'<span class="pill ok">✓ matched</span>':'<span class="pill bad">missing</span>'}</td></tr>`;
+  }).join('');
+  $('r_match').innerHTML = '<tr><th>Outlet</th><th>BillWise file</th><th></th></tr>' + rows;
+  rRefresh();
+}
+function rPrevSheet(){
+  const months = (rSheets||[]).filter(s=>s!=='Total');
+  return months.length ? months[months.length-1] : null;
+}
+function rRefresh(){
+  const bwNames = Object.values(rBw).map(f=>f.name);
+  const month = rsDetectMonth(bwNames, rGstr?rGstr.name:null);
+  const prev = rPrevSheet();
+  if(month){
+    const iso = month.getFullYear()+'-'+String(month.getMonth()+1).padStart(2,'0');
+    if(!$('r_month').value || $('r_month').dataset.auto==='1'){ $('r_month').value = iso; $('r_month').dataset.auto='1'; }
+  }
+  const mv = $('r_month').value;
+  if(mv && prev){
+    const parts = mv.split('-');
+    const d = new Date(+parts[0], +parts[1]-1, 1);
+    if(!$('r_tab').value || $('r_tab').dataset.auto==='1'){ $('r_tab').value = rsTabNameFor(d, prev); $('r_tab').dataset.auto='1'; }
+    $('r_monthNote').textContent = 'New tab "'+$('r_tab').value+'" will be copied from "'+prev+'". Total sheet updated too.';
+  } else if(!prev){
+    $('r_monthNote').textContent = 'Choose the Revenue Summary workbook first — the new tab copies its latest month tab.';
+  } else {
+    $('r_monthNote').textContent = 'Month could not be read from the file names — pick it above.';
+  }
+  $('r_build').disabled = !(rSum && rGstr && mv && $('r_tab').value);
+  $('r_buildNote').textContent = (rSum && rGstr && mv && $('r_tab').value) ? '' : 'Need: Revenue Summary + GSTR file + a month.';
+}
+document.addEventListener('click', e=>{
+  const b = e.target.closest('[data-rpick]');
+  if(b) $(b.dataset.rpick).click();
+});
+$('r_sumPick').onchange = async (e)=>{
+  const f = e.target.files[0]; e.target.value='';
+  if(!f) return;
+  const buf = await f.arrayBuffer();
+  try{
+    const res = await readSheet(buf, null);
+    rSheets = res.sheets || [];
+    rSum = {name:f.name, buf:buf};
+  }catch(err){ rSum = null; rSheets = []; $('r_msg').textContent = 'Could not read '+f.name+': '+err.message; }
+  rRenderFiles();
+};
+$('r_gstrPick').onchange = async (e)=>{
+  const f = e.target.files[0]; e.target.value='';
+  if(!f) return;
+  rGstr = {name:f.name, buf:await f.arrayBuffer()};
+  rRenderFiles();
+};
+$('r_tallyPick').onchange = async (e)=>{
+  const f = e.target.files[0]; e.target.value='';
+  if(!f) return;
+  rTally = {name:f.name, buf:await f.arrayBuffer()};
+  rRenderFiles();
+};
+$('r_month').onchange = ()=>{ $('r_month').dataset.auto='0'; const prev=rPrevSheet(); if(prev && $('r_month').value){ const p=$('r_month').value.split('-'); $('r_tab').value = rsTabNameFor(new Date(+p[0], +p[1]-1, 1), prev); $('r_tab').dataset.auto='1'; } rRefresh(); };
+$('r_tab').onchange = ()=>{ $('r_tab').dataset.auto='0'; rRefresh(); };
+const rd=$('r_drop'), rp=$('r_pick');
+rd.onclick=()=>rp.click();
+rd.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')rp.click()};
+rp.onchange=()=>{rBwHandle([...rp.files]);rp.value=''};
+['dragenter','dragover'].forEach(t=>rd.addEventListener(t,e=>{e.preventDefault();rd.classList.add('over')}));
+['dragleave','drop'].forEach(t=>rd.addEventListener(t,e=>{e.preventDefault();rd.classList.remove('over')}));
+rd.addEventListener('drop',e=>rBwHandle([...e.dataTransfer.files]));
+function rBwHandle(files){
+  const xlsxFiles = files.filter(f=>/\.xlsx?$/i.test(f.name) && !f.name.startsWith('~$'));
+  if(!xlsxFiles.length){ showToast('Drop .xlsx BillWise files'); return; }
+  const {matched, unmatched} = rsMatchBillwise(xlsxFiles.map(f=>f.name));
+  const byName = {}; xlsxFiles.forEach(f=>{ byName[f.name]=f; });
+  let added = 0;
+  for(const outlet of Object.keys(matched)){
+    const file = byName[matched[outlet]];
+    if(!file) continue;
+    file.arrayBuffer().then(buf=>{ rBw[outlet] = {name:file.name, buf:buf}; rRenderFiles(); });
+    added++;
+  }
+  if(unmatched.length) showToast('Could not match to an outlet: '+unmatched.join(', '));
+  else if(added) showToast('✓ '+added+' BillWise file(s) matched to outlets');
+  rRenderFiles();
+}
+$('r_clear').onclick=()=>{ rSum=null; rGstr=null; rTally=null; rBw={}; rSheets=[]; rOutBuf=null; rOutPreview=null; $('r_month').value=''; $('r_month').dataset.auto='1'; $('r_tab').value=''; $('r_tab').dataset.auto='1'; $('r_out').classList.add('hide'); rRenderFiles(); };
+
+$('r_build').onclick=async()=>{
+  if(!rSum || !rGstr) return;
+  const mv = $('r_month').value; if(!mv) return;
+  const p = mv.split('-');
+  const monthDate = new Date(+p[0], +p[1]-1, 1);
+  const monthName = $('r_tab').value.trim();
+  if(!monthName){ $('r_msg').textContent='Enter the new tab name.'; return; }
+  $('r_build').disabled=true; $('r_msg').textContent='';
+  const bwOutlets = Object.keys(rBw);
+  const total = 3 + bwOutlets.length + 2;
+  showProc('r_proc', total, 'Building Revenue Summary…'); await paint();
+  let done = 0;
+  const step = async (label)=>{ done++; updateProc('r_proc', done, total, label); await paint(); };
+  try{
+    await step('Reading GSTR Working file…');
+    const gstrRes = await readSheet(rGstr.buf, 'GSTR Working', {sheetRows:300});
+    const gstrAoA = gstrRes.data;
+    let tallyAoA = null;
+    if(rTally){ await step('Reading CCBkUp…'); tallyAoA = (await readSheet(rTally.buf, null)).data; }
+    else { await step('No CCBkUp — Tally columns will be highlighted'); }
+    const billwiseAoA = {};
+    for(const outlet of bwOutlets){
+      await step('Reading BillWise — '+outlet+'…');
+      billwiseAoA[outlet] = (await readSheet(rBw[outlet].buf, null)).data;
+    }
+    await step('Loading Excel engine…');
+    const ExcelJS = await loadExcelJS();
+    await step('Building the '+monthName+' tab…');
+    const res = await rsBuildRevenueSummary(ExcelJS, {
+      summaryBuf: rSum.buf, gstrAoA: gstrAoA, tallyAoA: tallyAoA,
+      billwiseAoA: billwiseAoA, monthDate: monthDate, monthName: monthName,
+    });
+    rOutBuf = res.buffer; rOutPreview = res.preview;
+    rOutName = rSum.name.replace(/\.xlsx?$/i,'');
+    if(!/_updated$/i.test(rOutName)) rOutName += '_updated';
+    rOutName += '.xlsx';
+    rRenderPreview(res);
+    hideProc('r_proc');
+    showToast('✓ Built '+monthName+' — '+bwOutlets.length+'/10 BillWise files'+(res.warnings.length?' • '+res.warnings.length+' note(s)':''));
+  }catch(err){
+    hideProc('r_proc');
+    $('r_msg').textContent = 'Could not build: '+(err && err.message ? err.message : err);
+  }
+  $('r_build').disabled=false; rRefresh();
+};
+function rRenderPreview(res){
+  $('r_out').classList.remove('hide');
+  const inr = n=> (n===null||n===undefined) ? '—' : n.toLocaleString('en-IN',{maximumFractionDigits:2});
+  const tot = (k)=> res.preview.reduce((s,p)=>s+(typeof p[k]==='number'?p[k]:0),0);
+  $('r_stats').innerHTML = [
+    ['📅 New tab', res.monthName+' (copied from '+res.templateName+')', ''],
+    ['🏬 Outlets', Object.keys(rBw).length+' / 10 BillWise files', ''],
+    ['₹ Total Other-than-Liquor (Posist)', inr(tot('otherPosist')), 'accent'],
+    ['₹ Total Liquor (Posist)', inr(tot('liquorPosist')), 'accent'],
+    ['💾 File name', rOutName, '']
+  ].map(([a,b,c])=>`<div class="stat ${c}"><small>${a}</small><strong style="${a==='💾 File name'?'font-size:13px;word-break:break-all':''}">${esc(b)}</strong></div>`).join('');
+  $('r_warn').textContent = res.warnings.length ? 'Notes: '+res.warnings.join(' • ') : '';
+  const heads = ['Outlet','Liquor Posist','Other Posist','Liquor Tally','Other Tally','Liquor VAT','Other GSTR-1','Other Inc (Tally)','Other Inc (GSTR-1)','Scrap Tally','Scrap GSTR-1'];
+  const keys = ['liquorPosist','otherPosist','liquorTally','otherTally','liquorVat','otherGstr1','otherIncomeTally','otherIncomeGstr','scrapTally','scrapGstr'];
+  $('r_prev').innerHTML = '<tr>'+heads.map(h=>`<th>${esc(h)}</th>`).join('')+'</tr>' +
+    res.preview.map(pp=>'<tr><td>'+esc(pp.outlet)+'</td>'+keys.map(k=>`<td class="n">${inr(pp[k])}</td>`).join('')+'</tr>').join('') +
+    '<tr><td><b>Total</b></td>'+keys.map(k=>`<td class="n"><b>${inr(tot(k))}</b></td>`).join('')+'</tr>';
+  $('r_dl').disabled = !rOutBuf;
+  $('r_msg').textContent = '';
+}
+$('r_dl').onclick=async()=>{
+  if(!rOutBuf) return;
+  $('r_dl').disabled=true; $('r_dl').textContent='⏳ Saving…'; await paint();
+  const bytes = rOutBuf;
+  $('r_dlInfo').textContent = 'Ready: '+rOutName+' • '+fmtKB(bytes.byteLength);
+  try{
+    let dl=null;
+    try{dl=(typeof claude!=='undefined')?await claude.use('downloads'):null}catch(_){dl=null}
+    if(dl){await dl.save({filename:rOutName,data:new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})})}
+    else{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+      a.download=rOutName;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+    }
+    showToast('✓ Downloaded '+rOutName+' ('+fmtKB(bytes.byteLength)+')');
+  }catch(e){
+    if(e&&e.code==='declined'){$('r_dl').disabled=false;$('r_dl').textContent='⬇ Download Excel';return;}
+    $('r_msg').textContent='Could not save the file ('+(e&&e.code||'error')+').';
+  }
+  $('r_dl').disabled=false; $('r_dl').textContent='⬇ Download Excel';
+};
+rRenderFiles();
 </script>
 </body>
 </html>
