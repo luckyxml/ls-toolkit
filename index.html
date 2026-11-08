@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LS Toolkit</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f7f3ec;--card:#fffdf9;--ink:#221a12;--mute:#7a7264;--line:#e8dfd0;--acc:#c2410c;--acc2:#7c2d12;--accbg:#fff1e8;--ok:#15803d;--okbg:#dcfce7;--amber:#92400e;--amberbg:#fef3c7;--grey:#57534e;--greybg:#e7e5e4;--bad:#b91c1c;--badbg:#fee2e2;--shadow:0 1px 3px rgba(34,26,18,.06),0 8px 24px rgba(34,26,18,.06)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#171310;--card:#221c17;--ink:#f1ece3;--mute:#a89e8d;--line:#3a3128;--acc:#fb923c;--acc2:#fdba74;--accbg:#2a1c12;--ok:#4ade80;--okbg:#14532d;--amber:#fbbf24;--amberbg:#451a03;--grey:#d6d3d1;--greybg:#44403c;--bad:#f87171;--badbg:#450a0a;--shadow:0 1px 3px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.3)}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#171310;--card:#221c17;--ink:#f1ece3;--mute:#a89e8d;--line:#3a3128;--acc:#fb923c;--acc2:#fdba74;--accbg:#2a1c12;--ok:#4ade80;--okbg:#14532d;--amber:#fbbf24;--amberbg:#451a03;--grey:#d6d3d1;--greybg:#44403c;--bad:#f87171;--badbg:#450a0a;--shadow:0 1px 3px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.3)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:24px 16px 56px}
+header{display:flex;gap:14px;align-items:center;justify-content:space-between;margin-bottom:6px}
+.brand{display:flex;gap:12px;align-items:center;min-width:0}
+.logo{width:48px;height:48px;flex:0 0 48px;border-radius:14px;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;letter-spacing:.5px;box-shadow:var(--shadow)}
+h1{font-size:24px;margin:0;line-height:1.15;letter-spacing:-.02em}
+p.sub{margin:2px 0 20px;color:var(--mute)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:var(--shadow)}
+#drop{border:2px dashed var(--line);border-radius:16px;padding:44px 16px;text-align:center;cursor:pointer;background:var(--card);transition:all .18s ease}
+#drop:hover,#m_drop:hover,#z_drop:hover{border-color:var(--acc)}
+.over{border-color:var(--acc)!important;background:var(--accbg)!important;transform:scale(1.01)}
+.rm{padding:2px 9px;border-radius:999px;font-size:13px;line-height:1.4}
+.rm:hover{border-color:var(--bad);color:var(--bad)}
+#drop b{display:block;font-size:17px;margin-bottom:4px}
+#drop span{color:var(--mute);font-size:13px}
+.drop-icon{font-size:34px;line-height:1;margin-bottom:10px}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 15px;border-radius:10px;cursor:pointer;transition:all .15s ease}
+button:hover{border-color:var(--acc)}
+button.pri{background:linear-gradient(135deg,var(--acc),var(--acc2));border-color:transparent;color:#fff;font-weight:700;box-shadow:0 4px 14px rgba(194,65,12,.28)}
+button.pri:hover{filter:brightness(1.06)}
+button:disabled{opacity:.5;cursor:default}
+.icon-btn{padding:8px 11px;border-radius:999px;font-size:15px;line-height:1}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card)}
+.stat small{display:block;color:var(--mute);font-size:12px;margin-bottom:2px}
+.stat strong{font-size:20px;line-height:1.2}
+.stat .ic{font-size:16px;margin-right:4px}
+.stat.green{border-left:4px solid var(--ok)}
+.stat.amber{border-left:4px solid var(--amber)}
+.stat.grey{border-left:4px solid var(--grey)}
+.stat.accent{border-left:4px solid var(--acc);background:var(--accbg)}
+.wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+tbody tr:nth-child(even){background:color-mix(in srgb,var(--bg) 55%,transparent)}
+th{position:sticky;top:0;background:var(--card);font-weight:700;z-index:1}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+.ok{color:var(--ok)}
+.bad{color:var(--bad)}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+.pill.ok{background:var(--okbg);color:var(--ok)}
+.pill.bad{background:var(--badbg);color:var(--bad)}
+.tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px;width:fit-content;max-width:100%;box-shadow:var(--shadow)}
+.tab{padding:9px 18px;border-radius:999px;border:1px solid transparent;background:transparent}
+.tab.on{background:linear-gradient(135deg,var(--acc),var(--acc2));border-color:transparent;color:#fff;font-weight:700}
+.tool-picker{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.tool-picker label{font-weight:700;font-size:15px;white-space:nowrap}
+.tool-picker select{flex:1;min-width:240px;font:inherit;font-weight:600;color:var(--ink);background:var(--bg);border:2px solid var(--acc);border-radius:12px;padding:12px 14px;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23c2410c' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:40px}
+.tool-picker select:focus{outline:2px solid var(--acc);outline-offset:2px}
+.tool-hint{width:100%;color:var(--mute);font-size:13px;margin-top:-6px}
+.note{color:var(--mute);font-size:13px;margin-top:8px}
+.hide{display:none}
+h2{font-size:15px;margin:0 0 10px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#221a12;color:#fff;padding:12px 18px;border-radius:999px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:all .25s ease;z-index:50;box-shadow:0 8px 30px rgba(0,0,0,.25);max-width:92vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast-btn{pointer-events:auto;margin-left:12px;background:#fff;color:#221a12;border:none;padding:5px 12px;border-radius:999px;font-weight:700;cursor:pointer}
+.dl-size{color:var(--mute);font-size:12px}
+.processing{display:flex;gap:14px;align-items:center;margin-top:16px;border-color:var(--acc);background:var(--accbg)}
+.processing.hide{display:none}
+.spinner{width:32px;height:32px;flex:0 0 32px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--acc);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.proc-body{flex:1;min-width:0}
+.proc-body b{display:block;font-size:15px}
+.proc-body span{color:var(--mute);font-size:13px;word-break:break-all}
+.pbar{height:8px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:8px}
+.pbar>div{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .2s ease}
+.proc-pct{font-weight:700;font-size:13px;white-space:nowrap}
+.drop.busy,.drop-zone-busy{opacity:.55;pointer-events:none}
+#drop.busy{opacity:.55;pointer-events:none}
+#m_drop.busy{opacity:.55;pointer-events:none}
+@media (max-width:640px){
+  main{padding:18px 12px 48px}
+  h1{font-size:21px}
+  .logo{width:42px;height:42px;flex-basis:42px;font-size:16px}
+  .tabs{width:100%}
+  .tab{flex:1;text-align:center;padding:10px 8px;font-size:14px}
+  #drop{padding:36px 12px}
+  button{padding:11px 16px}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .stat strong{font-size:18px}
+}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="brand">
+    <div class="logo" title="LS Toolkit"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/><path d="M3 17l9 5 9-5" opacity=".6"/></svg></div>
+    <div>
+      <h1>LS Toolkit</h1>
+      <p class="sub" style="margin:0">Drop files in. Get clean files out.</p>
+    </div>
+  </div>
+  <button id="themeToggle" class="icon-btn" title="Toggle dark mode" aria-label="Toggle dark mode">🌙</button>
+</header>
+<!-- TOOL PICKER — to add a new tool later: 1) add an <option value="t3"> here, 2) add a <div id="t3"> panel below, 3) it shows automatically, no other JS change needed -->
+<div class="card tool-picker">
+  <label for="toolSelect">🛠️ Choose a tool</label>
+  <select id="toolSelect">
+    <option value="t1" selected>📊 SSSGT Sales Combined</option>
+    <option value="t2">🧾 Billwise Sales Combined</option>
+    <option value="t3">🍽️ Zomato Order Level Stacker</option>
+    <option disabled>── More tools coming soon ──</option>
+  </select>
+  <span class="tool-hint" id="toolHint">Stacks BillWise files into the 18-column Master Data for SSSG / SSTG.</span>
+</div>
+<div id="t1" class="tool-panel">
+<div id="drop" tabindex="0">
+  <div class="drop-icon">📥</div>
+  <b>Drop BillWise files here or click to choose</b>
+  <span>Select as many outlet files as you like. Files starting with “Master Data” are ignored.</span>
+  <input id="pick" type="file" accept=".xlsx,.xls" multiple class="hide">
+</div>
+<div id="proc" class="card processing hide">
+  <div class="spinner"></div>
+  <div class="proc-body">
+    <b id="procTitle">Processing files…</b>
+    <span id="procDetail">Starting…</span>
+    <div class="pbar"><div id="procFill"></div></div>
+  </div>
+  <div class="proc-pct" id="procPct">0%</div>
+</div>
+
+<div id="out" class="hide">
+  <div class="card" style="margin-top:16px">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">Result</h2>
+      <div class="row">
+        <button id="clear">Clear</button>
+        <button id="dl" class="pri">⬇ Download Excel</button>
+      </div>
+    </div>
+    <div id="msg" class="bad" style="margin-top:8px"></div>
+    <div id="dlInfo" class="dl-size" style="margin-top:6px"></div>
+    <div class="stats" id="stats" style="margin-top:12px"></div>
+  </div>
+  <div class="card"><h2>Files</h2><div class="wrap"><table id="files"></table></div></div>
+  <div class="card"><h2>Preview <span style="color:var(--mute);font-weight:400">(first 100 rows)</span></h2><div class="wrap" style="max-height:420px"><table id="prev"></table></div></div>
+</div>
+</div>
+
+<div id="t2" class="tool-panel hide">
+<div id="m_drop" class="drop" tabindex="0" style="border:2px dashed var(--line);border-radius:16px;padding:44px 16px;text-align:center;cursor:pointer;background:var(--card)">
+  <div class="drop-icon">📥</div>
+  <b style="display:block;font-size:17px;margin-bottom:4px">Drop Posist BillWise Sales files here or click to choose</b>
+  <span style="color:var(--mute);font-size:13px">Keeps every column, adds an Outlet column. Files starting with “Nutcracker_Merged_Sales_” are ignored.</span>
+  <input id="m_pick" type="file" accept=".xlsx" multiple class="hide">
+</div>
+<div id="m_proc" class="card processing hide">
+  <div class="spinner"></div>
+  <div class="proc-body">
+    <b id="m_procTitle">Processing files…</b>
+    <span id="m_procDetail">Starting…</span>
+    <div class="pbar"><div id="m_procFill"></div></div>
+  </div>
+  <div class="proc-pct" id="m_procPct">0%</div>
+</div>
+<div id="m_out" class="hide">
+  <div class="card" style="margin-top:16px">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">Result</h2>
+      <div class="row"><button id="m_clear">Clear</button><button id="m_dl" class="pri">⬇ Download Excel</button></div>
+    </div>
+    <div id="m_msg" class="bad" style="margin-top:8px"></div>
+    <div id="m_dlInfo" class="dl-size" style="margin-top:6px"></div>
+    <div class="stats" id="m_stats" style="margin-top:12px"></div>
+    <div class="note" id="m_note"></div>
+  </div>
+  <div class="card"><h2>Files</h2><div class="wrap"><table id="m_files"></table></div></div>
+  <div class="card"><h2>Preview <span style="color:var(--mute);font-weight:400">(first 100 rows)</span></h2><div class="wrap" style="max-height:420px"><table id="m_prev"></table></div></div>
+</div>
+</div>
+
+<div id="t3" class="tool-panel hide">
+<div id="z_drop" class="drop" tabindex="0" style="border:2px dashed var(--line);border-radius:16px;padding:44px 16px;text-align:center;cursor:pointer;background:var(--card)">
+  <div class="drop-icon">🍽️</div>
+  <b style="display:block;font-size:17px;margin-bottom:4px">Drop Zomato settlement files here or click to choose</b>
+  <span style="color:var(--mute);font-size:13px">Reads the “Order Level” sheet from each file and stacks them. Add/Ded stays out, junk #REF! rows are skipped. Files starting with “Zomato_OrderLevel_Stacked” are ignored.</span>
+  <input id="z_pick" type="file" accept=".xlsx,.xls" multiple class="hide">
+</div>
+<div id="z_proc" class="card processing hide">
+  <div class="spinner"></div>
+  <div class="proc-body">
+    <b id="z_procTitle">Processing files…</b>
+    <span id="z_procDetail">Starting…</span>
+    <div class="pbar"><div id="z_procFill"></div></div>
+  </div>
+  <div class="proc-pct" id="z_procPct">0%</div>
+</div>
+<div id="z_out" class="hide">
+  <div class="card" style="margin-top:16px">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">Result</h2>
+      <div class="row"><button id="z_clear">Clear</button><button id="z_dl" class="pri">⬇ Download Excel</button></div>
+    </div>
+    <div id="z_msg" class="bad" style="margin-top:8px"></div>
+    <div id="z_dlInfo" class="dl-size" style="margin-top:6px"></div>
+    <div class="stats" id="z_stats" style="margin-top:12px"></div>
+    <div class="note" id="z_note"></div>
+  </div>
+  <div class="card"><h2>Files</h2><div class="wrap"><table id="z_files"></table></div></div>
+  <div class="card"><h2>Preview <span style="color:var(--mute);font-weight:400">(first 100 rows)</span></h2><div class="wrap" style="max-height:420px"><table id="z_prev"></table></div></div>
+</div>
+</div>
+</main>
+<div id="toast" role="status"></div>
+
+<script>
+const FINAL_COLUMNS=['Deployment','Bill Number','Bill Date','Tab Name','Table Number','Covers','Sales','Discount','Net Sales','Gross Bill Amount','Brand Pack Subscription','Packaging Charge [CART - SWIGGY]','Restaurant Packaging Charges','Service Charge @5%','Total Service Charge','Staff Welfare (Optional)@5%','Staff Welfare (Optional)@10%','Bill Status'];
+const SRC={'Bill Number':['Bill No.','Bill Number'],'Table Number':['Table No.','Table Number']};
+const HEADER_MARKERS=['Bill No.','Bill Number'];
+const TRAILER='Grand Total';
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+let results=[];   // {name, rows, error}
+let seen=new Set();
+let contentSeen=new Set(); /* fingerprints of loaded files, for content-based dupes */
+let master=[];
+
+const $=id=>document.getElementById(id);
+const drop=$('drop'),pick=$('pick');
+drop.onclick=()=>pick.click();
+drop.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')pick.click()};
+pick.onchange=()=>{handle([...pick.files]);pick.value=''};
+['dragenter','dragover'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',e=>handle([...e.dataTransfer.files]));
+$('clear').onclick=()=>{results=[];seen=new Set();contentSeen=new Set();master=[];render()};
+
+let toastTimer=null;
+function showToast(msg, action){
+  const t=$('toast');
+  t.textContent='';
+  t.appendChild(document.createTextNode(msg));
+  if(action){
+    const btn=document.createElement('button');
+    btn.textContent=action.label||'Undo';
+    btn.className='toast-btn';
+    btn.onclick=()=>{ t.classList.remove('show'); if(action.fn) action.fn(); };
+    t.appendChild(btn);
+  }
+  t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'), action?8000:3200);
+}
+/* Undo for a removed file — restores it instantly, no re-reading needed */
+let undoStack=[];
+function pushUndo(tool, entry){ if(!entry) return; undoStack.push({tool, entry}); if(undoStack.length>10) undoStack.shift(); }
+function doUndo(){
+  const u=undoStack.pop(); if(!u) return;
+  const k=dedupeKey(u.entry.name);
+  if(u.tool==='t1'){
+    if(seen.has(k)||(u.entry.fingerprint&&contentSeen.has(u.entry.fingerprint))){ showToast('Already added — '+u.entry.name); return; }
+    seen.add(k); if(u.entry.fingerprint) contentSeen.add(u.entry.fingerprint);
+    results.push(u.entry); results.sort((a,b)=>a.name.localeCompare(b.name)); build(); render(); showToast('✓ Restored '+u.entry.name);
+  } else if(u.tool==='t2'){
+    if(mSeen.has(k)||(u.entry.fingerprint&&mContentSeen.has(u.entry.fingerprint))){ showToast('Already added — '+u.entry.name); return; }
+    mSeen.add(k); if(u.entry.fingerprint) mContentSeen.add(u.entry.fingerprint);
+    mRes.push(u.entry); mRes.sort((a,b)=>a.name.localeCompare(b.name)); mBuild(); mRender(); showToast('✓ Restored '+u.entry.name);
+  } else if(u.tool==='t3'){
+    if(zSeen.has(k)){ showToast('Already added — '+u.entry.name); return; }
+    zSeen.add(k); zRes.push(u.entry); zRes.sort((a,b)=>a.name.localeCompare(b.name));
+    zRows=[]; zRes.forEach(r=>r.rows.forEach(x=>zRows.push([...x,r.name]))); zRender(); showToast('✓ Restored '+u.entry.name);
+  }
+}
+function fmtKB(bytes){ return bytes<1024 ? bytes+' B' : (bytes/1024).toFixed(1)+' KB'; }
+const paint=()=>new Promise(r=>setTimeout(r,30)); /* let the spinner paint before heavy XLSX work */
+/* ---------- Background worker: XLSX.read runs off the main thread ---------- */
+const XLSX_WORKER_SRC = `
+importScripts('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+self.onmessage = function(e){
+  var d = e.data;
+  try{
+    var wb = XLSX.read(d.buf, {type:'array', cellNF:true});
+    var name = d.sheet || wb.SheetNames[0];
+    if(!wb.Sheets[name]){ self.postMessage({id:d.id, ok:false, error:'Sheet not found: '+name}); return; }
+    var ws = wb.Sheets[name];
+    var out = [];
+    if(ws['!ref']){
+      var rg = XLSX.utils.decode_range(ws['!ref']);
+      for(var r=0;r<=rg.e.r;r++){
+        var row=[];
+        for(var c=0;c<=rg.e.c;c++){
+          var cell = ws[XLSX.utils.encode_cell({r:r,c:c})];
+          if(!cell || cell.v===undefined || cell.v===null || cell.v===''){ row.push(null); continue; }
+          if(cell.t==='n' && cell.z && XLSX.SSF.is_date(cell.z)){ row.push({v:cell.v, z:cell.z}); }
+          else row.push(cell.v);
+        }
+        out.push(row);
+      }
+    }
+    self.postMessage({id:d.id, ok:true, sheets:wb.SheetNames, data:out});
+  }catch(err){ self.postMessage({id:d.id, ok:false, error:String(err && err.message || err)}); }
+};
+`;
+let _xw=null, _xwSeq=0; const _xwPending=new Map();
+function readSheetViaWorker(buf, sheet){
+  return new Promise(function(resolve, reject){
+    try{
+      if(!_xw){
+        _xw = new Worker(URL.createObjectURL(new Blob([XLSX_WORKER_SRC], {type:'text/javascript'})));
+        _xw.onmessage = function(e){ var p=_xwPending.get(e.data.id); if(p){ _xwPending.delete(e.data.id); p(e.data); } };
+        _xw.onerror = function(){ var ps=[..._xwPending.values()]; _xwPending.clear(); _xw=null; ps.forEach(function(p){ p({ok:false, error:'worker error'}); }); };
+      }
+      var id=++_xwSeq;
+      _xwPending.set(id, function(res){ if(res.ok) resolve(res); else reject(new Error(res.error)); });
+      var copy=buf.slice(0); /* keep the original for the main-thread fallback */
+      _xw.postMessage({id:id, buf:copy, sheet:sheet||null}, [copy]);
+    }catch(err){ reject(err); }
+  });
+}
+function readSheetMain(buf, sheet){
+  const wb=XLSX.read(buf,{type:'array',cellNF:true});
+  const name=sheet||wb.SheetNames[0];
+  const ws=wb.Sheets[name];
+  if(!ws) throw new Error('Sheet not found: '+name);
+  const data=[];
+  if(ws['!ref']){
+    const rg=XLSX.utils.decode_range(ws['!ref']);
+    for(let r=0;r<=rg.e.r;r++){ const row=[];
+      for(let c=0;c<=rg.e.c;c++){ const cell=ws[XLSX.utils.encode_cell({r,c})];
+        if(!cell||cell.v===undefined||cell.v===null||cell.v===''){row.push(null);continue;}
+        if(cell.t==='n'&&cell.z&&XLSX.SSF.is_date(cell.z))row.push({v:cell.v,z:cell.z}); else row.push(cell.v);
+      } data.push(row);
+    }
+  }
+  return {sheets:wb.SheetNames, data};
+}
+async function readSheet(buf, sheet){
+  try{ return await readSheetViaWorker(buf, sheet); }
+  catch(e){ return readSheetMain(buf, sheet); }
+}
+function unwrapCell(v){ return (v && typeof v==='object' && 'v' in v) ? v.v : v; }
+/* Duplicate identity: exact name, but strip Restroworks' long hex download hash
+   (BillWise_Sales(...) For Nutcracker - Bandra_<48 hex>.xlsx) so a re-download
+   of the same outlet+month still counts as the same file. */
+function dedupeKey(name){
+  let s=String(name).replace(/\s*\(\d+\)\.xlsx?$/i,'.xlsx').replace(/ - copy\.xlsx?$/i,'.xlsx');
+  return s.replace(/_[0-9a-f]{32,}\.xlsx?$/i,'').trim().toLowerCase();
+}
+/* Content fingerprint: same outlet + same date range + same row count = same file,
+   even if the filename differs. Catches a re-download Windows named " (1)". */
+function rowFingerprint(rows, depKey, dateKey){
+  if(!rows||!rows.length) return '';
+  const dep=rows[0][depKey]||'';
+  const ds=rows.map(r=>parseBillDate(unwrapCell(r[dateKey]))).filter(Boolean).map(d=>d.getTime());
+  if(!ds.length) return String(dep)+'|'+rows.length;
+  const a=new Date(Math.min(...ds)), b=new Date(Math.max(...ds));
+  return dep+'|'+a.toISOString().slice(0,10)+'|'+b.toISOString().slice(0,10)+'|'+rows.length;
+}
+function splitNew(files, seenSet, isValid){
+  const valid=files.filter(isValid);
+  const dupes=[],todo=[],batch=new Set();
+  valid.forEach(f=>{
+    const k=dedupeKey(f.name);
+    if(seenSet.has(k)||batch.has(k)) dupes.push(f);
+    else { batch.add(k); todo.push(f); }
+  });
+  return {valid, dupes, todo};
+}
+/* Per-file remove (all three tools) — delegated, survives re-renders */
+document.addEventListener('click', e=>{
+  const b=e.target.closest('[data-rm]');
+  if(!b) return;
+  const name=decodeURIComponent(b.dataset.name||'');
+  const tool=b.dataset.rm;
+  if(tool==='t1'){ const gone=results.find(r=>r.name===name); results=results.filter(r=>r.name!==name); seen.delete(dedupeKey(name)); contentSeen=new Set(results.map(r=>r.fingerprint).filter(Boolean)); build(); render(); pushUndo('t1',gone); showToast('Removed '+name,{label:'Undo',fn:doUndo}); }
+  else if(tool==='t2'){ const gone=mRes.find(r=>r.name===name); mRes=mRes.filter(r=>r.name!==name); mSeen.delete(dedupeKey(name)); mContentSeen=new Set(mRes.map(r=>r.fingerprint).filter(Boolean)); mBuild(); mRender(); pushUndo('t2',gone); showToast('Removed '+name,{label:'Undo',fn:doUndo}); }
+  else if(tool==='t3'){ const gone=zRes.find(r=>r.name===name); zRes=zRes.filter(r=>r.name!==name); zSeen.delete(dedupeKey(name)); zRows=[]; zRes.forEach(r=>r.rows.forEach(x=>zRows.push([...x,r.name]))); zRender(); pushUndo('t3',gone); showToast('Removed '+name,{label:'Undo',fn:doUndo}); }
+});
+function showProc(p,total,title){
+  const box=$(p),dz=p==='m_proc'?$('m_drop'):p==='z_proc'?$('z_drop'):drop;
+  $(p+'Title').textContent=title||'Processing files…';
+  $(p+'Detail').textContent='Starting… 0 of '+total;
+  $(p+'Fill').style.width='0%'; $(p+'Pct').textContent='0%';
+  box.classList.remove('hide'); dz.classList.add('busy');
+}
+function updateProc(p,done,total,name){
+  const pct=total?Math.round(done/total*100):100;
+  $(p+'Detail').textContent='Reading '+done+' of '+total+(name?' — '+name:'');
+  $(p+'Fill').style.width=pct+'%'; $(p+'Pct').textContent=pct+'%';
+}
+function hideProc(p){
+  $(p).classList.add('hide');
+  (p==='m_proc'?$('m_drop'):p==='z_proc'?$('z_drop'):drop).classList.remove('busy');
+}
+$('themeToggle').onclick=()=>{
+  const r=document.documentElement;
+  const next=r.getAttribute('data-theme')==='dark'?'light':'dark';
+  r.setAttribute('data-theme',next);
+  try{localStorage.setItem('ls-toolkit-theme',next)}catch(_){}
+  $('themeToggle').textContent=next==='dark'?'☀️':'🌙';
+};
+try{
+  const saved=localStorage.getItem('ls-toolkit-theme');
+  if(saved){document.documentElement.setAttribute('data-theme',saved);$('themeToggle').textContent=saved==='dark'?'☀️':'🌙';}
+  else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches){$('themeToggle').textContent='☀️';}
+}catch(_){}
+
+function serialToDate(n){return new Date(Math.round((n-25569)*86400)*1000)}
+function dateToSerial(d){return Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())/86400000+25569}
+function parseBillDate(v){
+  if(v===null||v===undefined||v==='')return null;
+  if(typeof v==='object'&&'v' in v)return parseBillDate(v.v);
+  if(typeof v==='number')return serialToDate(v);
+  if(v instanceof Date)return v;
+  if(typeof v==='string'){
+    const tok=v.trim().split(' ')[0];let m;
+    if(m=tok.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/))return new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));
+    if(m=tok.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/))return new Date(Date.UTC(+m[3],+m[2]-1,+m[1]));
+  }
+  return null;
+}
+
+async function processFile(file){
+  const buf=await file.arrayBuffer();
+  const {data}=await readSheet(buf, null); /* parsed in the background worker */
+  let hr=-1;
+  for(let r=0;r<Math.min(15,data.length);r++){
+    if(data[r].some(v=>HEADER_MARKERS.includes(v))){hr=r;break}
+  }
+  if(hr<0)throw new Error('Could not find header row (looking for '+HEADER_MARKERS.join(' / ')+')');
+  const idx={};
+  data[hr].forEach((h,i)=>{if(h!==null&&!(h in idx))idx[h]=i});
+  const rows=[];
+  for(let r=hr+1;r<data.length;r++){
+    const row=data[r];
+    if(!row||row.every(v=>v===null||v===''))continue;
+    if(row.includes(TRAILER))continue;
+    const o={};
+    for(const col of FINAL_COLUMNS){
+      if(col==='Bill Status')continue;
+      let i;
+      for(const h of (SRC[col]||[col])){if(idx[h]!==undefined){i=idx[h];break}}
+      if(i===undefined||i>=row.length)o[col]=0;
+      else{const v=unwrapCell(row[i]);o[col]=(v==='-')?0:v}
+    }
+    rows.push(o);
+  }
+  return rows;
+}
+
+async function handle(files){
+  const {dupes, todo}=splitNew(files, seen, f=>/\.xlsx?$/i.test(f.name)&&!f.name.startsWith('~$')&&!f.name.startsWith('Master Data'));
+  if(!todo.length){ if(dupes.length) showToast('Already added — '+dupes.map(f=>f.name).join(', ')); return; }
+  showProc('proc',todo.length,'Processing files…'); await paint();
+  let done=0;
+  for(const f of todo){
+    updateProc('proc',done,todo.length,f.name); await paint();
+    seen.add(dedupeKey(f.name));
+    try{
+      const rows=await processFile(f);
+      const fp=rowFingerprint(rows,'Deployment','Bill Date');
+      if(fp&&contentSeen.has(fp)){ dupes.push(f); seen.delete(dedupeKey(f.name)); }
+      else { if(fp) contentSeen.add(fp); results.push({name:f.name,rows,fingerprint:fp}); }
+    }
+    catch(e){results.push({name:f.name,rows:[],error:e.message})}
+    done++; updateProc('proc',done,todo.length,f.name); await paint();
+  }
+  updateProc('proc',done,todo.length,'Merging rows…'); await paint();
+  results.sort((a,b)=>a.name.localeCompare(b.name));
+  build();render();
+  hideProc('proc');
+  if(results.length) showToast('✓ Done — '+results.filter(r=>!r.error).length+' file(s) • '+master.length.toLocaleString('en-IN')+' rows'+(dupes.length?' • '+dupes.length+' already added, skipped':''));
+}
+
+function status(r){
+  const z=v=>v===null||v===''||Number(v)===0;
+  return z(r['Sales'])?'Not to be Considered':(z(r['Net Sales'])?'NC Bills':'Billed');
+}
+function periodLabel(){
+  const ds=master.map(r=>r['Bill Date']).filter(Boolean);
+  if(!ds.length){const n=new Date();return String(n.getDate()).padStart(2,'0')+'-'+MONTHS[n.getMonth()]+'-'+n.getFullYear()}
+  const t=ds.map(d=>d.getTime());
+  const a=new Date(Math.min(...t)),b=new Date(Math.max(...t));
+  if(a.getUTCFullYear()===b.getUTCFullYear()&&a.getUTCMonth()===b.getUTCMonth())return MONTHS[a.getUTCMonth()]+' '+a.getUTCFullYear();
+  const p=n=>String(n).padStart(2,'0');
+  return p(a.getUTCDate())+' '+MONTHS[a.getUTCMonth()]+' to '+p(b.getUTCDate())+' '+MONTHS[b.getUTCMonth()]+' '+b.getUTCFullYear();
+}
+function build(){
+  master=[];
+  results.forEach(r=>r.rows.forEach(x=>master.push(x)));
+  master.forEach(r=>{r['Bill Date']=parseBillDate(r['Bill Date'])});
+}
+const fmtDate=d=>d?String(d.getUTCDate()).padStart(2,'0')+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+d.getUTCFullYear():'';
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+function render(){
+  $('out').classList.toggle('hide',!results.length);
+  if(!results.length)return;
+  const cnt={'Billed':0,'NC Bills':0,'Not to be Considered':0};
+  master.forEach(r=>cnt[status(r)]++);
+  const sum=k=>master.reduce((s,r)=>s+(typeof r[k]==='number'?r[k]:0),0);
+  const inr=n=>n.toLocaleString('en-IN',{maximumFractionDigits:2});
+  $('stats').innerHTML=[
+    ['📁 Files',results.filter(r=>!r.error).length+' / '+results.length,''],
+    ['🧾 Total rows',master.length.toLocaleString('en-IN'),''],
+    ['📅 Period',periodLabel(),''],
+    ['✅ Billed',cnt['Billed'].toLocaleString('en-IN'),'green'],
+    ['⚠️ NC Bills',cnt['NC Bills'].toLocaleString('en-IN'),'amber'],
+    ['⛔ Not to be Considered',cnt['Not to be Considered'].toLocaleString('en-IN'),'grey'],
+    ['₹ Sum of Net Sales',inr(sum('Net Sales')),'accent']
+  ].map(([a,b,c])=>`<div class="stat ${c}"><small>${a}</small><strong>${esc(b)}</strong></div>`).join('');
+  $('files').innerHTML='<tr><th>File</th><th>Rows</th><th>Result</th><th></th></tr>'+results.map(r=>
+    `<tr><td title="${esc(r.name)}">${esc(r.name)}</td><td class="n">${r.rows.length}</td><td>${r.error?'<span class="pill bad">Skipped: '+esc(r.error)+'</span>':'<span class="pill ok">✓ OK</span>'}</td><td><button class="rm" data-rm="t1" data-name="${encodeURIComponent(r.name)}" title="Remove this file">✕</button></td></tr>`).join('');
+  $('prev').innerHTML='<tr>'+FINAL_COLUMNS.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr>'+
+    master.slice(0,100).map(r=>'<tr>'+FINAL_COLUMNS.map(c=>{
+      let v=c==='Bill Status'?status(r):(c==='Bill Date'?fmtDate(r[c]):r[c]);
+      return `<td class="${typeof v==='number'?'n':''}">${v===null||v===undefined?'':esc(v)}</td>`}).join('')+'</tr>').join('');
+  $('dl').disabled=!master.length;
+  $('msg').textContent=master.length?'':'No rows were extracted. Nothing to write.';
+}
+
+$('dl').onclick=async()=>{
+  if(!master.length)return;
+  $('dl').disabled=true; $('dl').textContent='⏳ Building Excel…'; await paint();
+  const aoa=[FINAL_COLUMNS.slice()];
+  const sCol='G',nCol='I'; // Sales, Net Sales
+  master.forEach((r,i)=>{
+    const n=i+2;
+    aoa.push(FINAL_COLUMNS.map(c=>{
+      if(c==='Bill Status')return {t:'s',v:status(r),f:`IF(${sCol}${n}=0,"Not to be Considered",IF(${nCol}${n}=0,"NC Bills","Billed"))`};
+      const v=r[c];
+      if(c==='Bill Date'&&v)return {t:'n',v:dateToSerial(v),z:'dd-mm-yyyy'};
+      return v===undefined?null:v;
+    }));
+  });
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=FINAL_COLUMNS.map(c=>({wch:Math.max(14,Math.min(32,c.length+4))}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Master Data');
+  const bytes=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  const filename='Master Data - '+periodLabel()+'.xlsx';
+  $('dlInfo').textContent='Ready: '+filename+' • '+fmtKB(bytes.byteLength)+' • '+master.length.toLocaleString('en-IN')+' rows';
+  try{
+    let dl=null;
+    try{dl=(typeof claude!=='undefined')?await claude.use('downloads'):null}catch(_){dl=null}
+    if(dl){await dl.save({filename,data:new Blob([bytes])})}
+    else{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+      a.download=filename;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+    }
+    showToast('✓ Downloaded '+filename+' ('+fmtKB(bytes.byteLength)+')');
+  }catch(e){
+    if(e&&e.code==='declined'){$('dl').disabled=false;$('dl').textContent='⬇ Download Excel';return;}
+    $('msg').textContent='Could not save the file ('+(e&&e.code||'error')+').';
+  }
+  $('dl').disabled=false; $('dl').textContent='⬇ Download Excel';
+};
+
+/* ---------- Tool picker (dropdown — scalable, add tools via <option> + panel) ---------- */
+const TOOL_HINTS={
+  t1:'Stacks BillWise files into the 18-column Master Data for SSSG / SSTG.',
+  t2:'Keeps every column from the Posist exports and adds an Outlet column.',
+  t3:'Stacks the Order Level sheet from Zomato settlement files — same as zomato_orderlevel_stack.py, in the browser.'
+};
+function showTool(id){
+  document.querySelectorAll('.tool-panel').forEach(el=>el.classList.toggle('hide',el.id!==id));
+  const h=$('toolHint'); if(h) h.textContent=TOOL_HINTS[id]||'';
+}
+$('toolSelect').onchange=e=>showTool(e.target.value);
+showTool('t1');
+
+/* ---------- Merged Sales (merge_billwise_sales.py) ---------- */
+const M_ANCHORS={'Packaging Charge [CART - SWIGGY]':'Packaging Charge','Restaurant Packaging Charges':'Restaurant Packaging Charges','Food':'Food','Beverages':'Beverages','Non Alcoholic Beverages':'Non Alcoholic Beverages'};
+const M_TAX=['CGST','SGST','CGST_Ecom@2.5%','SGST_Ecom@2.5%','VAT'];
+const M_ORDER=['Outlet','Deployment','Bill No.','Advance Number','Order Id','Bill Date','Bill Open Time','Print Time','Close Time','Tab Name','Table No.','Covers','Sales','Discount','Net Sales','Gross Bill Amount','Packaging Charge','Packaging Charge CGST','Packaging Charge SGST','Restaurant Packaging Charges','Restaurant Packaging Charges CGST','Restaurant Packaging Charges SGST','Beverages','Beverages VAT','Food','Food CGST','Food SGST','Food CGST_Ecom@2.5%','Food SGST_Ecom@2.5%','Non Alcoholic Beverages','Non Alcoholic Beverages CGST','Non Alcoholic Beverages SGST','Non Alcoholic Beverages CGST_Ecom@2.5%','Non Alcoholic Beverages SGST_Ecom@2.5%','Total Service Charge','Round Off','Cash','Credit Card','Debit Card','Coupon','BTC','TTR','Smart Card','PayTM - Offline','HDFC QR','BANK TRANSFER - HDFC','Gift Card Voucher','Zomato','Zomato Pay','Swiggy','Swiggy DineOut','BTC(Other)','Amex','Total Tip','Offer Code','Electronic Bill'];
+const M_PREFIX='Nutcracker_Merged_Sales_';
+let mRes=[],mSeen=new Set(),mCols=[],mRows=[],mLeft=[],mContentSeen=new Set();
+
+function mRename(headers){
+  const noa=headers.includes('Beverages')&&!headers.includes('Non Alcoholic Beverages');
+  let cur=null;
+  return headers.map(h=>{
+    if(h in M_ANCHORS){let c=M_ANCHORS[h];if(h==='Beverages'&&noa)c='Non Alcoholic Beverages';cur=c;return c}
+    if(M_TAX.includes(h)&&cur!==null)return cur+' '+h;
+    cur=null;return h;
+  });
+}
+function sheetMatrix(ws){
+  if(!ws||!ws['!ref'])return [];
+  const rg=XLSX.utils.decode_range(ws['!ref']);
+  const out=[];
+  for(let r=0;r<=rg.e.r;r++){
+    const row=[];
+    for(let c=0;c<=rg.e.c;c++){
+      const cell=ws[XLSX.utils.encode_cell({r,c})];
+      if(!cell||cell.v===undefined||cell.v===null||cell.v===''){row.push(null);continue}
+      if(cell.t==='n'&&cell.z&&XLSX.SSF.is_date(cell.z))row.push({v:cell.v,z:cell.z});
+      else row.push(cell.v);
+    }
+    out.push(row);
+  }
+  return out;
+}
+function mPeriod(name){
+  const m=name.match(/(\d{4})[._-](\d{2})[._-](\d{2})--(\d{4})[._-](\d{2})[._-](\d{2})/);
+  if(!m)return null;
+  const [y1,m1,d1,y2,m2,d2]=m.slice(1).map(Number);
+  if(y1===y2&&m1===m2)return MONTHS[m1-1]+y1;
+  const f=(y,mo,d)=>String(d).padStart(2,'0')+MONTHS[mo-1]+String(y).slice(2);
+  return f(y1,m1,d1)+'-'+f(y2,m2,d2);
+}
+async function mProcess(file){
+  const buf=await file.arrayBuffer();
+  const {data:d}=await readSheet(buf, null); /* parsed in the background worker */
+  const a3=d[2]&&d[2][0],a6=d[5]&&d[5][0];
+  if(!(typeof a3==='string'&&a3.includes('BillWise_Sales')&&a6==='Deployment'))return null;
+  const outlet=d[0][0];
+  const raw=d[5].filter(h=>h!==null);
+  const heads=mRename(raw);
+  const rows=[];
+  for(let r=6;r<d.length;r++){
+    const row=d[r].slice(0,raw.length);
+    while(row.length<raw.length)row.push(null);
+    if(row.every(v=>v===null))continue;
+    const o={};
+    heads.forEach((h,i)=>{o[h]=row[i]});
+    o['Outlet']=outlet;
+    rows.push(o);
+  }
+  return {outlet,rows,cols:['Outlet',...heads]};
+}
+async function mHandle(files){
+  const {dupes, todo}=splitNew(files, mSeen, f=>/\.xlsx$/i.test(f.name)&&!f.name.startsWith('~$')&&!f.name.startsWith(M_PREFIX));
+  if(!todo.length){ if(dupes.length) showToast('Already added — '+dupes.map(f=>f.name).join(', ')); return; }
+  showProc('m_proc',todo.length,'Processing files…'); await paint();
+  let done=0;
+  for(const f of todo){
+    updateProc('m_proc',done,todo.length,f.name); await paint();
+    mSeen.add(dedupeKey(f.name));
+    try{
+      const r=await mProcess(f);
+      if(!r){ mRes.push({name:f.name,rows:[],skipped:true}); }
+      else{
+        const fp=rowFingerprint(r.rows,'Outlet','Bill Date');
+        if(fp&&mContentSeen.has(fp)){ dupes.push(f); mSeen.delete(dedupeKey(f.name)); }
+        else { if(fp) mContentSeen.add(fp); mRes.push({name:f.name,...r,period:mPeriod(f.name),fingerprint:fp}); }
+      }
+    }catch(e){mRes.push({name:f.name,rows:[],error:e.message})}
+    done++; updateProc('m_proc',done,todo.length,f.name); await paint();
+  }
+  updateProc('m_proc',done,todo.length,'Merging rows…'); await paint();
+  mRes.sort((a,b)=>a.name.localeCompare(b.name));
+  mBuild();mRender();
+  hideProc('m_proc');
+  if(mRes.length) showToast('✓ Done — '+mRes.filter(r=>!r.skipped&&!r.error).length+' file(s) • '+mRows.length.toLocaleString('en-IN')+' rows'+(dupes.length?' • '+dupes.length+' already added, skipped':''));
+}
+function mBuild(){
+  const ok=mRes.filter(r=>!r.skipped&&!r.error);
+  const seenCols=[];const set=new Set();
+  ok.forEach(r=>r.cols.forEach(c=>{if(!set.has(c)){set.add(c);seenCols.push(c)}}));
+  const first=M_ORDER.filter(c=>set.has(c));
+  mLeft=seenCols.filter(c=>!first.includes(c));
+  mCols=[...first,...mLeft];
+  mRows=[];ok.forEach(r=>r.rows.forEach(x=>mRows.push(x)));
+}
+function mLabel(){
+  const ps=mRes.filter(r=>!r.skipped&&!r.error&&r.period).map(r=>r.period);
+  if(!ps.length){const n=new Date();return MONTHS[n.getMonth()]+n.getFullYear()}
+  return ps.every(p=>p===ps[0])?ps[0]:'Mixed_Period';
+}
+const mShow=v=>{if(v===null||v===undefined)return '';if(typeof v==='object')return XLSX.SSF.format(v.z,v.v);return String(v)};
+function mRender(){
+  $('m_out').classList.toggle('hide',!mRes.length);
+  if(!mRes.length)return;
+  const ok=mRes.filter(r=>!r.skipped&&!r.error);
+  const net=mRows.reduce((s,r)=>s+(typeof r['Net Sales']==='number'?r['Net Sales']:0),0);
+  const inr=n=>n.toLocaleString('en-IN',{maximumFractionDigits:2});
+  $('m_stats').innerHTML=[['📁 Files used',ok.length+' / '+mRes.length,''],['🏬 Outlets',new Set(ok.map(r=>r.outlet)).size,''],['🧾 Total rows',mRows.length.toLocaleString('en-IN'),''],['🧩 Columns',mCols.length,''],['₹ Sum of Net Sales',inr(net),'accent'],['💾 File name',M_PREFIX+mLabel()+'.xlsx','']]
+    .map(([a,b,c])=>`<div class="stat ${c}"><small>${a}</small><strong style="${a==='💾 File name'?'font-size:13px;word-break:break-all':''}">${esc(b)}</strong></div>`).join('');
+  $('m_note').textContent=mLeft.length?'Columns not in the standard layout (added at the end): '+mLeft.join(', '):'';
+  $('m_files').innerHTML='<tr><th>File</th><th>Outlet</th><th>Rows</th><th>Result</th><th></th></tr>'+mRes.map(r=>
+    `<tr><td title="${esc(r.name)}">${esc(r.name)}</td><td>${esc(r.outlet||'')}</td><td class="n">${r.rows.length}</td><td>${r.skipped?'<span class="pill bad">Skipped: not a BillWise Sales export</span>':r.error?'<span class="pill bad">Error: '+esc(r.error)+'</span>':'<span class="pill ok">✓ OK</span>'}</td><td><button class="rm" data-rm="t2" data-name="${encodeURIComponent(r.name)}" title="Remove this file">✕</button></td></tr>`).join('');
+  $('m_prev').innerHTML='<tr>'+mCols.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr>'+
+    mRows.slice(0,100).map(r=>'<tr>'+mCols.map(c=>{const v=r[c];return `<td class="${typeof v==='number'?'n':''}">${esc(mShow(v))}</td>`}).join('')+'</tr>').join('');
+  $('m_dl').disabled=!mRows.length;
+  $('m_msg').textContent=mRows.length?'':'No valid BillWise Sales files could be read. Nothing to merge.';
+}
+const md=$('m_drop'),mp=$('m_pick');
+md.onclick=()=>mp.click();
+md.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')mp.click()};
+mp.onchange=()=>{mHandle([...mp.files]);mp.value=''};
+['dragenter','dragover'].forEach(t=>md.addEventListener(t,e=>{e.preventDefault();md.classList.add('over')}));
+['dragleave','drop'].forEach(t=>md.addEventListener(t,e=>{e.preventDefault();md.classList.remove('over')}));
+md.addEventListener('drop',e=>mHandle([...e.dataTransfer.files]));
+$('m_clear').onclick=()=>{mRes=[];mSeen=new Set();mContentSeen=new Set();mRows=[];mCols=[];mRender()};
+$('m_dl').onclick=async()=>{
+  if(!mRows.length)return;
+  $('m_dl').disabled=true; $('m_dl').textContent='⏳ Building Excel…'; await paint();
+  const aoa=[mCols.slice()];
+  mRows.forEach(r=>aoa.push(mCols.map(c=>{const v=r[c];if(v===undefined||v===null)return null;if(typeof v==='object')return {t:'n',v:v.v,z:v.z};return v})));
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=mCols.map(c=>({wch:Math.max(12,Math.min(String(c).length+4,30))}));
+  ws['!autofilter']={ref:'A1:'+XLSX.utils.encode_col(mCols.length-1)+(mRows.length+1)};
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Merged Sales');
+  const bytes=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  const filename=M_PREFIX+mLabel()+'.xlsx';
+  $('m_dlInfo').textContent='Ready: '+filename+' • '+fmtKB(bytes.byteLength)+' • '+mRows.length.toLocaleString('en-IN')+' rows';
+  try{
+    let dl=null;
+    try{dl=(typeof claude!=='undefined')?await claude.use('downloads'):null}catch(_){dl=null}
+    if(dl){await dl.save({filename,data:new Blob([bytes])})}
+    else{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+      a.download=filename;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+    }
+    $('m_msg').textContent='';
+    showToast('✓ Downloaded '+filename+' ('+fmtKB(bytes.byteLength)+')');
+  }catch(e){
+    if(e&&e.code==='declined'){$('m_dl').disabled=false;$('m_dl').textContent='⬇ Download Excel';return;}
+    $('m_msg').textContent='Could not save the file ('+(e&&e.code||'error')+').';
+  }
+  $('m_dl').disabled=false; $('m_dl').textContent='⬇ Download Excel';
+};
+
+/* ---------- Zomato Order Level Stacker (port of zomato_orderlevel_stack.py) ---------- */
+const Z_CANON=[
+"S.No.","Order ID","Order Date","Week No.","Res. name","Res. ID","Discount Construct","Mode of payment","Order status (Delivered/ Cancelled/ Rejected)",
+"Cancellation policy\n(% Amount refunded back to restaurant partner)","Cancellation/ Rejection Reason","Cancelled/ Rejected State\n(Order status at the time it was cancelled/ rejected)",
+"Order type","Delivery State code","Subtotal (items total)","Packaging charge","Delivery charge for restaurants on self logistics","Restaurant discount [Promo]",
+"Restaurant Discount [BOGO, Freebies, Gold, Brand pack & others]","Brand pack subscription fee ","Delivery charge discount / Relisting discount ","Total GST collected from customers",
+"Net order value\n[(1) + (2) + (3) - (4) - (5) + (6) - (7) + (8)]","Commissionable value (excludes customer GST)\n[(A) + (7) - (8) - (6) - (3)]",
+"Service fees %","Service fee\n[ (9) * (10) ]","Payment mechanism fee","Service fee & payment mechanism fees\n[(11) + (12)]",
+"Taxes on service & payment mechanism fees\n(B) * 18%","Applicable amount for TCS","Applicable amount for 9(5)","Tax collected at source","TCS IGST amount","TDS 194O amount",
+"GST paid by Zomato on behalf of restaurant - under section 9(5)","GST to be paid by Restaurant partner to Govt.","Government charges\n[(13) + (16) + (17) + (18) + (19)]",
+"Customer Compensation/Recoupment","Delivery Charges Recovery","Amount received in cash (on self delivery orders)","Credit note/(Debit Note) adjustment",
+"Promo recovery adjustment","Extra Inventory Ads and Misc. (order level deduction)","Brand loyalty points redemption","Express Order Fee",
+"Other order-level deductions\n[(21) + (22) + (23) + (24) + (25) + (26) + (27) + (28)]","Net Deductions\n(B) + (C) + (D)",
+"Net Additions \n(cancellation refund for cancelled orders/Tip for Kitchen Staff for delivered orders)","Order level Payout\n(A) - (E) + (F)",
+"Settlement status","Settlement date","Bank UTR","Unsettled Amount","Customer ID"];
+const Z_SOURCE='Source file';
+const Z_OUT='Zomato_OrderLevel_Stacked.xlsx';
+/* Month from Order Dates: single month -> _Oct'26, span -> _Sep-Oct'26, none -> no suffix */
+function zParseDate(v){ if(v&&typeof v==='object'&&'v' in v)return zParseDate(v.v); if(v instanceof Date)return v; if(typeof v==='number')return serialToDate(v); if(typeof v==='string')return parseBillDate(v); return null; }
+function zMonthLabel(){
+  const dCol=Z_CANON.indexOf('Order Date');
+  const ds=zRows.map(r=>zParseDate(r[dCol])).filter(Boolean);
+  if(!ds.length)return '';
+  const t=ds.map(d=>d.getTime());
+  const a=new Date(Math.min(...t)),b=new Date(Math.max(...t));
+  const yy=d=>String(d.getUTCFullYear()).slice(2);
+  if(a.getUTCFullYear()===b.getUTCFullYear()&&a.getUTCMonth()===b.getUTCMonth())return "_"+MONTHS[a.getUTCMonth()]+"'"+yy(a);
+  if(a.getUTCFullYear()===b.getUTCFullYear())return "_"+MONTHS[a.getUTCMonth()]+'-'+MONTHS[b.getUTCMonth()]+"'"+yy(b);
+  return "_"+MONTHS[a.getUTCMonth()]+"'"+yy(a)+'-'+MONTHS[b.getUTCMonth()]+"'"+yy(b);
+}
+function zFilename(){ return 'Zomato_OrderLevel_Stacked'+zMonthLabel()+'.xlsx'; }
+let zRes=[],zSeen=new Set(),zRows=[],zNotes=[];
+function zNorm(h){
+  let s=String(h).replace(/\n/g,' ').trim().toLowerCase();
+  s=s.replace(/\(/g,'[').replace(/\)/g,']');
+  s=s.replace(/\s*\/\s*/g,'/'); s=s.replace(/\s+/g,' ').trim();
+  s=s.replace(/^total /,''); return s;
+}
+const Z_BY_KEY={}; Z_CANON.forEach(h=>{const k=zNorm(h); if(!(k in Z_BY_KEY)) Z_BY_KEY[k]=h;});
+function zMapColumns(headers){
+  const mapping={},used=new Set(),notes=[];
+  headers.forEach((h,i)=>{
+    if(h===null||h===undefined||h==='')return;
+    const canon=Z_BY_KEY[zNorm(h)];
+    if(canon!==undefined&&!used.has(Z_CANON.indexOf(canon))){mapping[i]=Z_CANON.indexOf(canon);used.add(Z_CANON.indexOf(canon));}
+  });
+  headers.forEach((h,i)=>{
+    if(h===null||h===undefined||h===''||(i in mapping))return;
+    if(i<Z_CANON.length&&!used.has(i)){mapping[i]=i;used.add(i);notes.push("col "+(i+1)+" '"+h+"' matched by position, not by header text");}
+  });
+  return {mapping,notes};
+}
+async function zProcess(file){
+  const buf=await file.arrayBuffer();
+  let res;
+  try{ res=await readSheet(buf, 'Order Level'); } /* parsed in the background worker */
+  catch(e){ if(/Sheet not found/.test(e.message)) return {skipped:true,reason:"no 'Order Level' sheet"}; throw e; }
+  const data=res.data;
+  let hr=-1;
+  for(let r=0;r<Math.min(10,data.length);r++){
+    const vals=(data[r]||[]).map(v=>v===null||v===undefined?'':String(v).trim().toLowerCase());
+    if(vals.includes('order id')&&vals.includes('res. id')){hr=r;break;}
+  }
+  if(hr<0)return {skipped:true,reason:'header row not found'};
+  const headers=data[hr]||[];
+  const {mapping,notes}=zMapColumns(headers);
+  const snoCol=Z_CANON.indexOf('S.No.'),oidCol=Z_CANON.indexOf('Order ID');
+  const rows=[];let skippedCount=0;
+  for(let r=hr+1;r<data.length;r++){
+    const row=data[r]||[];
+    if(row.every(v=>v===null||v===undefined||(typeof v==='string'&&!v.trim())))continue;
+    const out=new Array(Z_CANON.length).fill(null);
+    row.forEach((v,i)=>{if(i in mapping)out[mapping[i]]=unwrapCell(v);});
+    const sno=out[snoCol],oid=out[oidCol];
+    const snoOk=typeof sno==='number'||(typeof sno==='string'&&/^\d+$/.test(sno.trim()));
+    const oidOk=oid!==null&&oid!==undefined&&String(oid).trim()&&!String(oid).trim().startsWith('#');
+    if(!(snoOk&&oidOk)){skippedCount++;continue;}
+    rows.push(out);
+  }
+  return {rows,notes,skippedCount};
+}
+async function zHandle(files){
+  const {dupes, todo}=splitNew(files, zSeen, f=>/\.xlsx?$/i.test(f.name)&&!f.name.startsWith('~$')&&!f.name.startsWith('Zomato_OrderLevel_Stacked'));
+  if(!todo.length){ if(dupes.length) showToast('Already added — '+dupes.map(f=>f.name).join(', ')); return; }
+  showProc('z_proc',todo.length,'Processing files…'); await paint();
+  let done=0;
+  for(const f of todo){
+    updateProc('z_proc',done,todo.length,f.name); await paint();
+    zSeen.add(dedupeKey(f.name));
+    try{
+      const r=await zProcess(f);
+      if(r.skipped){zRes.push({name:f.name,rows:[],skipped:true,reason:r.reason});}
+      else{zRes.push({name:f.name,rows:r.rows,notes:r.notes,skippedCount:r.skippedCount}); if(r.notes&&r.notes.length)zNotes.push(f.name+': '+r.notes.join('; '));}
+    }catch(e){zRes.push({name:f.name,rows:[],error:e.message});}
+    done++; updateProc('z_proc',done,todo.length,f.name); await paint();
+  }
+  updateProc('z_proc',done,todo.length,'Merging rows…'); await paint();
+  zRes.sort((a,b)=>a.name.localeCompare(b.name));
+  zRows=[]; zRes.forEach(r=>r.rows.forEach(x=>zRows.push([...x,r.name])));
+  zRender(); hideProc('z_proc');
+  if(zRes.length) showToast('✓ Done — '+zRes.filter(r=>!r.skipped&&!r.error).length+' file(s) • '+zRows.length.toLocaleString('en-IN')+' rows'+(dupes.length?' • '+dupes.length+' already added, skipped':''));
+}
+const zShow=v=>{if(v===null||v===undefined)return '';if(v instanceof Date)return v.toLocaleString('en-IN');return String(v);};
+function zRender(){
+  $('z_out').classList.toggle('hide',!zRes.length);
+  if(!zRes.length)return;
+  const ok=zRes.filter(r=>!r.skipped&&!r.error);
+  const payCol=Z_CANON.indexOf('Order level Payout\n(A) - (E) + (F)');
+  const resCol=Z_CANON.indexOf('Res. ID');
+  const payout=zRows.reduce((s,r)=>s+(typeof r[payCol]==='number'?r[payCol]:0),0);
+  const inr=n=>n.toLocaleString('en-IN',{maximumFractionDigits:2});
+  $('z_stats').innerHTML=[
+    ['📁 Files used',ok.length+' / '+zRes.length,''],
+    ['🧾 Total rows',zRows.length.toLocaleString('en-IN'),''],
+    ['🏬 Res. IDs',new Set(zRows.map(r=>r[resCol])).size,''],
+    ['₹ Sum of Order level Payout',inr(payout),'accent'],
+    ['💾 File name',zFilename(),'']
+  ].map(([a,b,c])=>`<div class="stat ${c}"><small>${a}</small><strong style="${a==='💾 File name'?'font-size:13px;word-break:break-all':''}">${esc(b)}</strong></div>`).join('');
+  $('z_note').textContent=zNotes.length?'Position-matched columns: '+zNotes.join(' | '):'';
+  $('z_files').innerHTML='<tr><th>File</th><th>Rows</th><th>Result</th><th></th></tr>'+zRes.map(r=>
+    `<tr><td title="${esc(r.name)}">${esc(r.name)}</td><td class="n">${r.rows.length}</td><td>${r.skipped?'<span class="pill bad">Skipped: '+esc(r.reason||'')+'</span>':r.error?'<span class="pill bad">Error: '+esc(r.error)+'</span>':'<span class="pill ok">✓ OK</span>'}</td><td><button class="rm" data-rm="t3" data-name="${encodeURIComponent(r.name)}" title="Remove this file">✕</button></td></tr>`).join('');
+  const heads=[...Z_CANON,Z_SOURCE];
+  $('z_prev').innerHTML='<tr>'+heads.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr>'+
+    zRows.slice(0,100).map(r=>'<tr>'+r.map(v=>`<td class="${typeof v==='number'?'n':''}">${esc(zShow(v))}</td>`).join('')+'</tr>').join('');
+  $('z_dl').disabled=!zRows.length;
+  $('z_msg').textContent=zRows.length?'':'No valid Order Level rows could be read. Nothing to stack.';
+}
+const zd=$('z_drop'),zp=$('z_pick');
+zd.onclick=()=>zp.click();
+zd.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')zp.click()};
+zp.onchange=()=>{zHandle([...zp.files]);zp.value=''};
+['dragenter','dragover'].forEach(t=>zd.addEventListener(t,e=>{e.preventDefault();zd.classList.add('over')}));
+['dragleave','drop'].forEach(t=>zd.addEventListener(t,e=>{e.preventDefault();zd.classList.remove('over')}));
+zd.addEventListener('drop',e=>zHandle([...e.dataTransfer.files]));
+$('z_clear').onclick=()=>{zRes=[];zSeen=new Set();zRows=[];zNotes=[];zRender()};
+$('z_dl').onclick=async()=>{
+  if(!zRows.length)return;
+  $('z_dl').disabled=true; $('z_dl').textContent='⏳ Building Excel…'; await paint();
+  const aoa=[[ ...Z_CANON,Z_SOURCE]];
+  zRows.forEach(r=>aoa.push(r.map(v=>v===undefined?null:v)));
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[...Z_CANON,Z_SOURCE].map(c=>({wch:Math.max(12,Math.min(String(c).length+4,30))}));
+  ws['!autofilter']={ref:'A1:'+XLSX.utils.encode_col(Z_CANON.length)+(zRows.length+1)};
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Zomato');
+  const bytes=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  const filename=zFilename();
+  $('z_dlInfo').textContent='Ready: '+filename+' • '+fmtKB(bytes.byteLength)+' • '+zRows.length.toLocaleString('en-IN')+' rows';
+  try{
+    let dl=null;
+    try{dl=(typeof claude!=='undefined')?await claude.use('downloads'):null}catch(_){dl=null}
+    if(dl){await dl.save({filename,data:new Blob([bytes])})}
+    else{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+      a.download=filename;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+    }
+    $('z_msg').textContent='';
+    showToast('✓ Downloaded '+filename+' ('+fmtKB(bytes.byteLength)+')');
+  }catch(e){
+    if(e&&e.code==='declined'){$('z_dl').disabled=false;$('z_dl').textContent='⬇ Download Excel';return;}
+    $('z_msg').textContent='Could not save the file ('+(e&&e.code||'error')+').';
+  }
+  $('z_dl').disabled=false; $('z_dl').textContent='⬇ Download Excel';
+};
+</script>
+</body>
+</html>
