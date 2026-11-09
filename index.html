@@ -65,6 +65,8 @@ td.n{text-align:right;font-variant-numeric:tabular-nums}
 .tool-hint{width:100%;color:var(--mute);font-size:13px;margin-top:-6px}
 .note{color:var(--mute);font-size:13px;margin-top:8px}
 .hide{display:none}
+.warn{background:var(--amberbg);color:var(--amber);border-radius:10px;padding:10px 12px;font-size:13px;font-weight:600}
+footer{max-width:980px;margin:0 auto 40px;padding:0 16px;color:var(--mute);font-size:12px;text-align:center}
 h2{font-size:15px;margin:0 0 10px}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#221a12;color:#fff;padding:12px 18px;border-radius:999px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:all .25s ease;z-index:50;box-shadow:0 8px 30px rgba(0,0,0,.25);max-width:92vw;text-align:center}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -242,6 +244,7 @@ h2{font-size:15px;margin:0 0 10px}
     <button id="r_build" class="pri" disabled>Build month tab</button>
     <button id="r_clear">Clear</button>
   </div>
+  <div class="warn" id="r_mismatch" style="display:none;margin-top:8px"></div>
   <div class="note" id="r_monthNote" style="margin-top:8px"></div>
   <div class="note" id="r_buildNote"></div>
 </div>
@@ -269,6 +272,7 @@ h2{font-size:15px;margin:0 0 10px}
 </div>
 </div>
 </main>
+<footer>LS Toolkit • <span id="ver"></span> • Your files never leave your browser.</footer>
 <div id="toast" role="status"></div>
 
 <script>
@@ -1114,7 +1118,7 @@ const RS_MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","
 const RS_MONTHS_FULL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 function rsDetectMonth(billwiseNames, gstrName){
   for(const name of billwiseNames){
-    const m = name.match(/\((\d{4})\.(\d{2})\.\d{2}--/);
+    const m = name.match(/(\d{4})\.(\d{2})\.\d{2}--/);
     if(m) return new Date(+m[1], +m[2]-1, 1);
   }
   if(gstrName){
@@ -1144,6 +1148,58 @@ function rsTabNameFor(monthDate, prevName){
   for(const f of fmts){ if(rsFmtMonth(prev, f)===prevName) return rsFmtMonth(monthDate, f); }
   return rsFmtMonth(monthDate, "%b'%y");
 }
+/* ---- month-mismatch detection ---- */
+/* "2026-10" style keys, so months compare as plain strings. */
+function rsMonthKey(y, m){ return y + '-' + String(m).padStart(2, '0'); }
+function rsMonthLabel(key){
+  const p = String(key).split('-');
+  return RS_MONTHS_SHORT[+p[1]-1] + ' ' + p[0];
+}
+/* BillWise file name carries its date range: 2026.10.01--2026.10.31 (with or
+   without the parens the Restroworks download uses). */
+function rsMonthOfBillwise(name){
+  const m = String(name).match(/(\d{4})\.(\d{2})\.(\d{2})--(\d{4})\.(\d{2})\.(\d{2})/);
+  if(!m) return null;
+  const start = rsMonthKey(+m[1], +m[2]);
+  const end = rsMonthKey(+m[4], +m[5]);
+  return {month: start, spans: (start!==end ? end : null)};
+}
+/* GSTR file name carries YYYYMM, e.g. GSTR_202610_Working_File.xlsx */
+function rsMonthOfGstr(name){
+  const m = String(name).match(/(\d{4})(\d{2})/);
+  if(!m) return null;
+  return {month: rsMonthKey(+m[1], +m[2]), spans: null};
+}
+/* Compare every file's month against the expected month (the month picker
+   when set, else the most common detected month). Returns warning strings;
+   empty means everything agrees. Files whose month can't be read are skipped. */
+function rsMonthWarnings(inp){
+  const warns = [];
+  const months = [];
+  if(inp.gstrName){
+    const g = rsMonthOfGstr(inp.gstrName);
+    if(g) months.push({label: 'GSTR file', month: g.month});
+  }
+  const bw = inp.billwiseByOutlet || {};
+  for(const outlet of Object.keys(bw)){
+    const b = rsMonthOfBillwise(bw[outlet]);
+    if(!b) continue;
+    months.push({label: outlet + ' BillWise', month: b.month});
+    if(b.spans) warns.push(outlet + ' BillWise covers ' + rsMonthLabel(b.month) + '–' + rsMonthLabel(b.spans) + ' (spans two months)');
+  }
+  if(!months.length) return warns;
+  let expected = inp.selectedMonth || null;
+  if(!expected){
+    const counts = {};
+    months.forEach(x=>{ counts[x.month] = (counts[x.month]||0) + 1; });
+    expected = Object.keys(counts).sort((a,b)=>counts[b]-counts[a])[0];
+  }
+  months.forEach(x=>{
+    if(x.month!==expected) warns.push(x.label + ' is ' + rsMonthLabel(x.month) + ', expected ' + rsMonthLabel(expected));
+  });
+  return warns;
+}
+
 function rsMatchBillwise(fileNames){
   const matched = {}; const unmatched = [];
   for(const name of fileNames){
@@ -1322,10 +1378,11 @@ async function rsBuildRevenueSummary(ExcelJS, opts){
 }
 
 if(typeof module!=="undefined" && module.exports){
-  module.exports = {RS_OUTLET_MAP, RS_ROW_ORDER, RS_OUTLET_PATTERNS, rsNum, rsExtractPosist, rsExtractGstr, rsExtractTally, rsDetectMonth, rsTabNameFor, rsMatchBillwise, rsCloneWorksheet, rsBuildRevenueSummary};
+  module.exports = {RS_OUTLET_MAP, RS_ROW_ORDER, RS_OUTLET_PATTERNS, rsNum, rsExtractPosist, rsExtractGstr, rsExtractTally, rsDetectMonth, rsTabNameFor, rsMatchBillwise, rsMonthOfBillwise, rsMonthOfGstr, rsMonthWarnings, rsMonthLabel, rsCloneWorksheet, rsBuildRevenueSummary};
 }
 
 /* ---------- Revenue Summary Builder (port of revenue_summary_automation.py + run_this.py) ---------- */
+const LS_VERSION = 'v1.1 · updated 9 Nov 2026';
 let _excelJSPromise=null;
 function loadExcelJS(){
   if(window.ExcelJS) return Promise.resolve(window.ExcelJS);
@@ -1385,6 +1442,14 @@ function rRefresh(){
     $('r_monthNote').textContent = 'Choose the Revenue Summary workbook first — the new tab copies its latest month tab.';
   } else {
     $('r_monthNote').textContent = 'Month could not be read from the file names — pick it above.';
+  }
+  const bwByOutlet = {};
+  Object.keys(rBw).forEach(o=>{ bwByOutlet[o] = rBw[o].name; });
+  const mmWarns = rsMonthWarnings({gstrName: rGstr?rGstr.name:null, billwiseByOutlet: bwByOutlet, selectedMonth: mv || null});
+  const mm = $('r_mismatch');
+  if(mm){
+    mm.innerHTML = mmWarns.length ? '⚠️ Month mismatch — '+mmWarns.map(w=>esc(w)).join('<br>') : '';
+    mm.style.display = mmWarns.length ? '' : 'none';
   }
   $('r_build').disabled = !(rSum && rGstr && mv && $('r_tab').value);
   $('r_buildNote').textContent = (rSum && rGstr && mv && $('r_tab').value) ? '' : 'Need: Revenue Summary + GSTR file + a month.';
@@ -1531,6 +1596,8 @@ $('r_dl').onclick=async()=>{
   $('r_dl').disabled=false; $('r_dl').textContent='⬇ Download Excel';
 };
 rRenderFiles();
+const _verEl = document.getElementById('ver');
+if(_verEl) _verEl.textContent = LS_VERSION;
 </script>
 </body>
 </html>
