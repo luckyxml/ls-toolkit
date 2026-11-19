@@ -118,7 +118,6 @@ h2{font-size:15px;margin:0 0 10px}
     <option value="t2">🧾 Billwise Sales Combined</option>
     <option value="t3">🍽️ Zomato Order Level Stacker</option>
     <option value="t4">📈 Revenue Summary Builder</option>
-    <option disabled>── More tools coming soon ──</option>
   </select>
   <span class="tool-hint" id="toolHint">Stacks BillWise files into the 18-column Master Data for SSSG / SSTG.</span>
 </div>
@@ -1404,7 +1403,7 @@ if(typeof module!=="undefined" && module.exports){
 }
 
 /* ---------- Revenue Summary Builder (port of revenue_summary_automation.py + run_this.py) ---------- */
-const LS_VERSION = 'v1.3 · updated 16 Nov 2026';
+const LS_VERSION = 'v1.4 · updated 19 Nov 2026';
 let _excelJSPromise=null;
 function loadExcelJS(){
   if(window.ExcelJS) return Promise.resolve(window.ExcelJS);
