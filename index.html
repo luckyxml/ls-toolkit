@@ -276,8 +276,10 @@ h2{font-size:15px;margin:0 0 10px}
 <div id="toast" role="status"></div>
 
 <script>
+/* Tool 1 core: browser port of build_master_data.py — keep the column map,
+   header/trailer rules and Bill Status formula in sync with that file. */
 const FINAL_COLUMNS=['Deployment','Bill Number','Bill Date','Tab Name','Table Number','Covers','Sales','Discount','Net Sales','Gross Bill Amount','Brand Pack Subscription','Packaging Charge [CART - SWIGGY]','Restaurant Packaging Charges','Service Charge @5%','Total Service Charge','Staff Welfare (Optional)@5%','Staff Welfare (Optional)@10%','Bill Status'];
-const SRC={'Bill Number':['Bill No.','Bill Number'],'Table Number':['Table No.','Table Number']};
+const SRC={'Deployment':['Deployment'],'Bill Number':['Bill No.','Bill Number'],'Bill Date':['Bill Date'],'Tab Name':['Tab Name'],'Table Number':['Table No.','Table Number'],'Covers':['Covers'],'Sales':['Sales'],'Discount':['Discount'],'Net Sales':['Net Sales'],'Gross Bill Amount':['Gross Bill Amount'],'Brand Pack Subscription':['Brand Pack Subscription'],'Packaging Charge [CART - SWIGGY]':['Packaging Charge [CART - SWIGGY]'],'Restaurant Packaging Charges':['Restaurant Packaging Charges'],'Service Charge @5%':['Service Charge @5%'],'Total Service Charge':['Total Service Charge'],'Staff Welfare (Optional)@5%':['Staff Welfare (Optional)@5%'],'Staff Welfare (Optional)@10%':['Staff Welfare (Optional)@10%']};
 const HEADER_MARKERS=['Bill No.','Bill Number'];
 const TRAILER='Grand Total';
 const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -321,7 +323,7 @@ function doUndo(){
   if(u.tool==='t1'){
     if(seen.has(k)||(u.entry.fingerprint&&contentSeen.has(u.entry.fingerprint))){ showToast('Already added — '+u.entry.name); return; }
     seen.add(k); if(u.entry.fingerprint) contentSeen.add(u.entry.fingerprint);
-    results.push(u.entry); results.sort((a,b)=>a.name.localeCompare(b.name)); build(); render(); showToast('✓ Restored '+u.entry.name);
+    results.push(u.entry); results.sort((a,b)=>a.name<b.name?-1:a.name>b.name?1:0); build(); render(); showToast('✓ Restored '+u.entry.name);
   } else if(u.tool==='t2'){
     if(mSeen.has(k)||(u.entry.fingerprint&&mContentSeen.has(u.entry.fingerprint))){ showToast('Already added — '+u.entry.name); return; }
     mSeen.add(k); if(u.entry.fingerprint) mContentSeen.add(u.entry.fingerprint);
@@ -527,7 +529,7 @@ async function handle(files){
     done++; updateProc('proc',done,todo.length,f.name); await paint();
   }
   updateProc('proc',done,todo.length,'Merging rows…'); await paint();
-  results.sort((a,b)=>a.name.localeCompare(b.name));
+  results.sort((a,b)=>a.name<b.name?-1:a.name>b.name?1:0); /* plain code-unit sort, same order as Python sorted() in build_master_data.py */
   build();render();
   hideProc('proc');
   if(results.length) showToast('✓ Done — '+results.filter(r=>!r.error).length+' file(s) • '+master.length.toLocaleString('en-IN')+' rows'+(dupes.length?' • '+dupes.length+' already added, skipped':''));
@@ -535,7 +537,9 @@ async function handle(files){
 
 function status(r){
   const z=v=>v===null||v===''||Number(v)===0;
-  return z(r['Sales'])?'Not to be Considered':(z(r['Net Sales'])?'NC Bills':'Billed');
+  if(z(r['Sales']))return 'Not to be Considered';
+  const n=r['Net Sales'];
+  return (n===null||n===''||Math.abs(Number(n))<1)?'NC Bills':'Billed';
 }
 function periodLabel(){
   const ds=master.map(r=>r['Bill Date']).filter(Boolean);
@@ -580,25 +584,43 @@ function render(){
   $('msg').textContent=master.length?'':'No rows were extracted. Nothing to write.';
 }
 
+/* Tool 1 writer: ExcelJS, so the output matches build_master_data.py exactly —
+   bold header, frozen top row, DD-MM-YYYY dates. Pure function: ExcelJS is
+   passed in (same pattern as tool 4's rsBuildRevenueSummary) so the same code
+   runs in Node for verification. Bill Dates are UTC-midnight Dates, which
+   ExcelJS writes as the correct day serial. */
+async function buildT1Workbook(ExcelJS, rows){
+  const wb=new ExcelJS.Workbook();
+  const ws=wb.addWorksheet('Master Data');
+  FINAL_COLUMNS.forEach((c,i)=>{ws.getColumn(i+1).width=Math.max(14,Math.min(32,c.length+4));});
+  const hdr=ws.addRow(FINAL_COLUMNS);
+  hdr.eachCell(c=>{c.font={bold:true};});
+  const sCol='G',nCol='I'; // Sales, Net Sales
+  rows.forEach((r,i)=>{
+    const n=i+2;
+    const row=ws.addRow(FINAL_COLUMNS.map(c=>{
+      if(c==='Bill Status')return {formula:`IF(${sCol}${n}=0,"Not to be Considered",IF(ABS(${nCol}${n})<1,"NC Bills","Billed"))`,result:status(r)};
+      const v=r[c];
+      return v===undefined?null:v;
+    }));
+    const d=row.getCell(3);
+    if(d.value instanceof Date)d.numFmt='DD-MM-YYYY';
+  });
+  ws.views=[{state:'frozen',xSplit:0,ySplit:1}];
+  return wb.xlsx.writeBuffer();
+}
+
 $('dl').onclick=async()=>{
   if(!master.length)return;
   $('dl').disabled=true; $('dl').textContent='⏳ Building Excel…'; await paint();
-  const aoa=[FINAL_COLUMNS.slice()];
-  const sCol='G',nCol='I'; // Sales, Net Sales
-  master.forEach((r,i)=>{
-    const n=i+2;
-    aoa.push(FINAL_COLUMNS.map(c=>{
-      if(c==='Bill Status')return {t:'s',v:status(r),f:`IF(${sCol}${n}=0,"Not to be Considered",IF(${nCol}${n}=0,"NC Bills","Billed"))`};
-      const v=r[c];
-      if(c==='Bill Date'&&v)return {t:'n',v:dateToSerial(v),z:'dd-mm-yyyy'};
-      return v===undefined?null:v;
-    }));
-  });
-  const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=FINAL_COLUMNS.map(c=>({wch:Math.max(14,Math.min(32,c.length+4))}));
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Master Data');
-  const bytes=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  let bytes;
+  try{
+    const ExcelJS=await loadExcelJS();
+    bytes=await buildT1Workbook(ExcelJS, master);
+  }catch(e){
+    $('msg').textContent='Could not build the file ('+(e&&e.message||'error')+').';
+    $('dl').disabled=false; $('dl').textContent='⬇ Download Excel'; return;
+  }
   const filename='Master Data - '+periodLabel()+'.xlsx';
   $('dlInfo').textContent='Ready: '+filename+' • '+fmtKB(bytes.byteLength)+' • '+master.length.toLocaleString('en-IN')+' rows';
   try{
@@ -1382,7 +1404,7 @@ if(typeof module!=="undefined" && module.exports){
 }
 
 /* ---------- Revenue Summary Builder (port of revenue_summary_automation.py + run_this.py) ---------- */
-const LS_VERSION = 'v1.1 · updated 9 Nov 2026';
+const LS_VERSION = 'v1.3 · updated 16 Nov 2026';
 let _excelJSPromise=null;
 function loadExcelJS(){
   if(window.ExcelJS) return Promise.resolve(window.ExcelJS);
